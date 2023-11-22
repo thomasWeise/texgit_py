@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-Thank you for supporting the [`latexgit`](https://thomasweise.github.io/latexgit), a Python package for making files from `git` repositories accessible in `LaTeX` by helping to make it safer.
+Thank you for supporting the [`latexgit`](https://thomasweise.github.io/latexgit_py), a Python package for making files from `git` repositories accessible in `LaTeX` by helping to make it safer.
 
 `latexgit` should only be used as a component in safe and secure environments.
 None of its API should be exposed via the network or in any other way that might constitute a security risk.

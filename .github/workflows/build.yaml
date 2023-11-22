@@ -26,7 +26,7 @@ jobs:
 # attempt to install it again from github
     - name: install latexgit from github
       run: |
-        pip install git+https://github.com/thomasWeise/latexgit.git
+        pip install git+https://github.com/thomasWeise/latexgit_py.git
         python -c "import latexgit"
 # fix urls in documentation
     - name: fix documentation urls

@@ -30,14 +30,14 @@ This will install the latest official release of our package as well as [all dep
 If you want to install the latest source code version from GitHub (which may not yet be officially released), you can do
 
 ```shell
-pip install repository+https://github.com/thomasWeise/latexgit.git
+pip install repository+https://github.com/thomasWeise/latexgit_py.git
 ```
 
 If you want to install the latest source code version from GitHub (which may not yet be officially released) and you have set up a private/public key for GitHub, you can also do:
 
 ```shell
-repository clone ssh://repository@github.com/thomasWeise/latexgit
-pip install latexgit
+repository clone ssh://repository@github.com/thomasWeise/latexgit_py
+pip install latexgit_py
 ```
 
 This may sometimes work better if you are having trouble reaching GitHub via `https` or `http`.

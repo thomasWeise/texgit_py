@@ -14,7 +14,7 @@ root_path = os.path.abspath(os.path.join(doc_path, "..", ".."))
 sys.path.insert(0, root_path)
 
 # set the base url
-html_baseurl = "https://thomasweise.github.io/latexgit/"
+html_baseurl = "https://thomasweise.github.io/latexgit_py/"
 
 # We want to include the contents of our GitHub README.md file.
 # So first, we need to load the README.md file.
@@ -38,7 +38,7 @@ in_code: bool = False  # we only process non-code lines
 skip: bool = True
 # detects strings of the form [xyz](#123-bla) and gives \1=xyz and \2=bla
 regex_search = re.compile("(\\[.+?])\\(#\\d+-(.+?)\\)")
-license_link: str = "https://github.com/thomasWeise/latexgit/blob/main/LICENSE"
+license_link: str = "https://github.com/thomasWeise/latexgit_py/blob/main/LICENSE"
 needs_newline: bool = False
 can_add_anyway: bool = True
 for line in old_lines:

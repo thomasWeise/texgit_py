@@ -31,15 +31,15 @@ jobs:
 # fix urls in documentation
     - name: fix documentation urls
       run: |
-        find /home/runner/work/latexgit/latexgit/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ href=\"_static\// href=\"\/latexgit\/_static\//g'
-        find /home/runner/work/latexgit/latexgit/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ src=\"_static\// src=\"\/latexgit\/_static\//g'
-        touch /home/runner/work/latexgit/latexgit/docs/build/.nojekyll
+        find /home/runner/work/latexgit_py/latexgit/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ href=\"_static\// href=\"\/latexgit\/_static\//g'
+        find /home/runner/work/latexgit_py/latexgit/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ src=\"_static\// src=\"\/latexgit\/_static\//g'
+        touch /home/runner/work/latexgit_py/latexgit/docs/build/.nojekyll
 # deploy to github pages
     - name: deploy documentation
       uses: JamesIves/github-pages-deploy-action@a1ea191d508feb8485aceba848389d49f80ca2dc
       with:
         branch: gh-pages
-        folder: /home/runner/work/latexgit/latexgit/docs/build/
+        folder: /home/runner/work/latexgit_py/latexgit/docs/build/
         single-commit: true
 # publish to pypi _only_ on release:
     - name: publish to pypi

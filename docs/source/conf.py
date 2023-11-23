@@ -38,7 +38,8 @@ in_code: bool = False  # we only process non-code lines
 skip: bool = True
 # detects strings of the form [xyz](#123-bla) and gives \1=xyz and \2=bla
 regex_search = re.compile("(\\[.+?])\\(#\\d+-(.+?)\\)")
-license_link: str = "https://github.com/thomasWeise/latexgit_py/blob/main/LICENSE"
+license_link: str = \
+    "https://github.com/thomasWeise/latexgit_py/blob/main/LICENSE"
 needs_newline: bool = False
 can_add_anyway: bool = True
 for line in old_lines:

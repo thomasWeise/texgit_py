@@ -27,8 +27,8 @@ with io.open(os.path.join(root_path, "README.md"),
 # We discard the top-level heading as well as the badge for the build status.
 # We need to move all sub-headings one step up.
 # Furthermore, we can turn all absolute URLs starting with
-# http://thomasweise.github.io/latexgit/xxx to local references, i.e., ./xxx.
-# Finally, it seems that the myst parser now again drops the numerical
+# http://thomasweise.github.io/latexgit_py/xxx to local references, i.e.,
+# ./xxx. Finally, it seems that the myst parser now again drops the numerical
 # prefixes of links, i.e., it tags `## 1.2. Hello` with id `hello` instead of
 # `12-hello`. This means that we need to fix all references following the
 # pattern `[xxx](#12-hello)` to `[xxx](#hello)`. We do this with a regular

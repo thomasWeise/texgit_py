@@ -22,8 +22,8 @@
 # with a text file `requirements-dev.txt` that has the exact same contents as
 # this file here.
 #
-# `latexgit` is available at https://thomasweise.github.io/latexgit.
-# This file is available at https://github.com/thomasWeise/latexgit.
+# `latexgit` is available at https://thomasweise.github.io/latexgit_py.
+# This file is available at https://github.com/thomasWeise/latexgit_py.
 #
 # Below, we list each library required for development and specify the reason
 # why it is needed. Notice that these libraries may, in turn, depend on other

@@ -19,9 +19,12 @@ new_lines = []
 in_code: bool = False  # we only process non-code lines
 # detects strings of the form [xyz](#123-bla) and gives \1=xyz and \2=bla
 regex_search = re.compile("(\\[.+?])\\(#\\d+-(.+?)\\)")
-regex_repl: str = "\\1(https://thomasweise.github.io/latexgit/index.html#\\2)"
-license_old: str = "https://github.com/thomasWeise/latexgit/blob/main/LICENSE"
-license_new: str = "https://thomasweise.github.io/latexgit/LICENSE.html"
+regex_repl: str = \
+    "\\1(https://thomasweise.github.io/latexgit_py/index.html#\\2)"
+license_old: str = \
+    "https://github.com/thomasWeise/latexgit_py/blob/main/LICENSE"
+license_new: str = \
+    "https://thomasweise.github.io/latexgit_py/LICENSE.html"
 
 for line in old_lines:
     line = line.rstrip()

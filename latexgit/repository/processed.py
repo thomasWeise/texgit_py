@@ -62,8 +62,9 @@ class Processed(AbstractContextManager):
                         continue
                     self.__mapped[(pt1, tuple(key[1]))] = pt2
 
-    def get_file(self, repo_url: str, relative_path: str,
-                 processor: Iterable[str] | None = ()) -> Path:
+    def get_file_and_url(
+            self, repo_url: str, relative_path: str,
+            processor: Iterable[str] | None = ()) -> tuple[Path, str]:
         """
         Get a specified, potentially pre-processed file.
 
@@ -80,12 +81,14 @@ class Processed(AbstractContextManager):
             raise type_error(processor, "preprocessor", Iterable)
 
         # first step: get source repository file
-        path: Final[Path] = self.__git.get_file(repo_url, relative_path)
+        ps: Final[tuple[Path, str]] = self.__git.get_file_and_url(
+            repo_url, relative_path)
+        path: Final[Path] = ps[0]
 
         # second step: prepare postprocessing command
         command: Final[tuple[str, ...]] = tuple(processor)
         if len(command) <= 0:  # no postprocessing command?
-            return path  # then return path to git file directory
+            return path, ps[1]  # then return path to git file directory
 
         # so there is postprocessing to do: look up in cache
         key: Final[tuple[Path, tuple[str, ...]]] = (path, command)
@@ -93,7 +96,7 @@ class Processed(AbstractContextManager):
         if key in self.__mapped:  # found in cache?
             pt: Path = self.__mapped[key]
             logger(f"found cache entry {pt!r} for {logstr}.")
-            return pt  # return path to cached file
+            return pt, ps[1]  # return path to cached file
 
         # not in cache: create new file and apply post processing
         (handle, fpath) = mkstemp(prefix="proc_", dir=self.__cache_dir)
@@ -110,7 +113,7 @@ class Processed(AbstractContextManager):
 
         logger(f"done piping {len(ret)} characters {logstr}")
         self.__mapped[key] = dest  # remember in cache
-        return dest  # return path
+        return dest, ps[1]  # return path
 
     def close(self) -> None:
         """Close the processed repository and write cache list."""

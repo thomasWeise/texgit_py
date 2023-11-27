@@ -1,4 +1,6 @@
 [![make build](https://github.com/thomasWeise/latexgit_py/actions/workflows/build.yaml/badge.svg)](https://github.com/thomasWeise/latexgit_py/actions/workflows/build.yaml)
+[![pypi version](https://img.shields.io/pypi/v/latexgit)](https://pypi.org/project/latexgit)
+[![pypi downloads](https://img.shields.io/pypi/dw/latexgit.svg)](https://pypistats.org/packages/latexgit)
 [![coverage report](https://thomasweise.github.io/latexgit_py/tc/badge.svg)](https://thomasweise.github.io/latexgit_py/tc/index.html)
 
 
@@ -12,7 +14,11 @@
 
 ## 1. Introduction
 
-`latexgit` is a preprocessor for accessing files from `git` repositories from `LaTeX`.
+`latexgit` is a preprocessor for accessing files from `git` repositories from LaTeX.
+This Python package works in conjunction with the [`latexgit` LaTeX style](http://github.com/thomasWeise/latexgit_tex/).
+Basically, the LaTeX package fills the `aux` file of a TeX project with repository file loading request.
+This Python package here then parses the `aux` file, loads the requests, then performs the request, and adds commands with the resulting file paths and URLs to the `aux` file.
+In the second pdfLaTeX compilation, these then become available.
 
 
 ## 2. Installation

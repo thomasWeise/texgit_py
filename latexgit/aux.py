@@ -170,16 +170,20 @@ def __get_request(line: str) \
         for s in post.split()) if len(t) > 0)
 
 
-#: the response header
-RESPONSE: Final[str] = r"\@latexgit@path"
+#: the response header for the path
+RESPONSE_PATH: Final[str] = r"\@latexgit@path"
+#: the response header for the url
+RESPONSE_URL: Final[str] = r"\@latexgit@url"
 
 
-def __make_path(base_dir: Path, file: Path, index: int) -> str:
+def __make_response(
+        base_dir: Path, file_and_url: tuple[Path, str], index: int) \
+        -> tuple[str, str]:
     r"""
     Make a path entry command.
 
     :param base_dir: the base directory
-    :param file: the file path
+    :param file_and_url: the file path and the url
     :param index: the file index
     :return: the `latexgit` compliant path command
 
@@ -187,15 +191,25 @@ def __make_path(base_dir: Path, file: Path, index: int) -> str:
     >>> import latexgit.aux as aa
     >>> fle = Path.file(aa.__file__)
     >>> bd = Path.directory(dirname(dirname(fle)))
-    >>> __make_path(bd, fle, 3)
+    >>> x = __make_response(bd, (fle, 'https://example.com'), 3)
+    >>> x[0]
     '\\xdef\\@latexgit@pathd{latexgit/aux.py}%'
-    >>> __make_path(bd, fle, 0)
+    >>> x[1]
+    '\\xdef\\@latexgit@urld{https://example.com}%'
+    >>> x = __make_response(bd, (fle, 'https://example.com#3_4'), 0)
+    >>> x[0]
     '\\xdef\\@latexgit@patha{latexgit/aux.py}%'
+    >>> x[1]
+    '\\xdef\\@latexgit@urla{https://example.com\\#3_4}%'
     """
     base_dir.enforce_dir()
+    suffix: Final[str] = __int_to_alpha(index)
+    file: Final[Path] = file_and_url[0]
+    url: Final[str] = file_and_url[1].replace("#", r"\#")
     file.enforce_file()
-    return (f"\\xdef{RESPONSE}{__int_to_alpha(index)}{{"
-            f"{file.relative_to(base_dir)}}}%")
+    return ((f"\\xdef{RESPONSE_PATH}{suffix}{{"
+            f"{file.relative_to(base_dir)}}}%"),
+            f"\\xdef{RESPONSE_URL}{suffix}{{{url}}}%")
 
 
 def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
@@ -234,6 +248,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     append: list[str] = []
 
     try:
+        resolved: int = 0
         for line in lines:
             command: tuple[str, str, tuple[str, ...] | None] | None = (
                 __get_request(line))
@@ -245,8 +260,9 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
                 logger(f"The repository directory is {git_dir!r}.")
                 proc = Processed(git_dir)
 
-            append.append(__make_path(base_dir, proc.get_file(
-                *command), len(append)))
+            append.extend(__make_response(base_dir, proc.get_file_and_url(
+                *command), resolved))
+            resolved += 1
     finally:
         if proc is not None:
             proc.close()
@@ -255,7 +271,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     if len(append) <= 0:
         logger("No file requests found. Nothing to do.")
 
-    logger(f"Found and resolved {len(append)} file requests.")
+    logger(f"Found and resolved {resolved} file requests.")
     lines.extend(append)
     aux_file.write_all(lines)
     logger(f"Finished flushing {len(lines)} lines to aux file {aux_file!r}.")

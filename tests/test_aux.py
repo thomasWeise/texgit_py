@@ -2,7 +2,7 @@
 
 from typing import Final
 
-from latexgit.aux import REQUEST, RESPONSE, run
+from latexgit.aux import REQUEST, RESPONSE_PATH, RESPONSE_URL, run
 from latexgit.utils.temp import TempDir, TempFile
 
 
@@ -22,9 +22,11 @@ def test_aux() -> None:
         run(tf)
         got_1 = tf.read_all_list()
 
-        assert len(got_1) == (len(txt) + 3)
+        assert len(got_1) == (len(txt) + 6)
         assert len([s for s in got_1 if s.startswith(
-            f"\\xdef{RESPONSE}")]) == 3
+            f"\\xdef{RESPONSE_PATH}")]) == 3
+        assert len([s for s in got_1 if s.startswith(
+            f"\\xdef{RESPONSE_URL}")]) == 3
 
         tf.write_all(txt)
         run(tf)

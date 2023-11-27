@@ -60,17 +60,20 @@ class GitManager:
         self.__repos[url] = gt
         return gt
 
-    def get_file(self, repo_url: str, relative_path: str) -> Path:
+    def get_file_and_url(self, repo_url: str, relative_path: str) \
+            -> tuple[Path, str]:
         """
-        Get a path to a file from the given git repository.
+        Get a path to a file from the given git repository and also the URL.
 
         :param repo_url: the repository url.
         :param relative_path: the relative path
-        :return: the file
+        :return: a tuple of file and URL
         """
         if not isinstance(relative_path, str):
             raise type_error(relative_path, "relative_path", str)
-        file: Final[Path] = self.get_repo(repo_url).path.resolve_inside(
+        repo: Final[GitRepository] = self.get_repo(repo_url)
+        file: Final[Path] = repo.path.resolve_inside(
             relative_path)
         file.enforce_file()
-        return file
+        url: Final[str] = repo.make_url(relative_path)
+        return file, url

@@ -10,29 +10,44 @@ from latexgit.utils.temp import TempDir
 
 def test_processed() -> None:
     """Test the processed files repository."""
-    with TempDir.create() as td:
+    with (TempDir.create() as td):
         proc: Final[Processed] = Processed(td)
 
-        file_1: Final[Path] = proc.get_file(
+        file_1, url_1 = proc.get_file_and_url(
             "https://github.com/thomasWeise/moptipy",
             "moptipy/api/operators.py")
+        assert isinstance(file_1, Path)
+        assert isinstance(url_1, str)
         file_1.enforce_file()
         td.enforce_contains(file_1)
+        assert url_1.startswith("https://github.com/thomasWeise/moptipy/blob/")
+        assert url_1.endswith("/moptipy/api/operators.py")
 
-        file_2: Final[Path] = proc.get_file(
+        file_2, url_2 = proc.get_file_and_url(
             "https://github.com/thomasWeise/moptipy",
             "moptipy/api/operators.py",
             ("head", "-n", 5))
+        assert isinstance(file_2, Path)
+        assert isinstance(url_2, str)
         file_2.enforce_file()
         assert file_2 != file_1
+        assert url_2 == url_1
         td.enforce_contains(file_2)
         assert len(file_2.read_all_list()) == 5
 
-        assert proc.get_file(
+        file_3, url_3 = proc.get_file_and_url(
             "https://github.com/thomasWeise/moptipy",
             "moptipy/api/operators.py",
-            ("head", "-n", 5)) is file_2
+            ("head", "-n", 5))
+        assert isinstance(file_3, Path)
+        assert file_3 == file_2
+        assert isinstance(url_3, str)
+        assert url_3 == url_2
 
-        assert proc.get_file(
+        file_4, url_4 = proc.get_file_and_url(
             "https://github.com/thomasWeise/moptipy",
-            "moptipy/api/operators.py") == file_1
+            "moptipy/api/operators.py")
+        assert isinstance(file_4, Path)
+        assert file_4 == file_1
+        assert isinstance(url_4, str)
+        assert url_4 == url_2

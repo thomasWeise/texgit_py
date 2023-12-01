@@ -1,9 +1,91 @@
 """In this file, we put some shared tools for rendering source codes."""
 
+import re
 import sys
 from typing import Callable, Iterable
 
+from latexgit.utils.strings import enforce_non_empty_str
 from latexgit.utils.types import type_error
+
+# the split pattern
+__SPLT: re.Pattern = re.compile("[;,+\n\t ]", re.MULTILINE)
+
+
+def split_line_choices(lines: str | None) -> list[int] | None:
+    """
+    Split line choices to iterables of `int` or `None`.
+
+    This function converts `1`-based line selections into `0`-based ones.
+
+    :param lines: the line choices
+    :return: the split line choices.
+
+    >>> print(split_line_choices(None))
+    None
+    >>> print(split_line_choices(""))
+    None
+    >>> print(split_line_choices(","))
+    None
+    >>> split_line_choices("1")
+    [0]
+    >>> split_line_choices("1,2")
+    [0, 1]
+    >>> split_line_choices("1-5")
+    [0, 1, 2, 3, 4]
+    >>> split_line_choices("3;4-5;7-7;22+12-15;")
+    [2, 3, 4, 6, 21, 11, 12, 13, 14]
+    """
+    if lines is None:
+        return None
+    if not isinstance(lines, str):
+        raise type_error(lines, "lines", (str, None))
+    sel: list[int] = []
+
+    for patf in __SPLT.split(lines):
+        pats: str = patf.strip()
+        if len(pats) <= 0:
+            continue
+        idx: int = pats.find("-")
+        if idx < 0:
+            sel.append(int(enforce_non_empty_str(pats)) - 1)
+            continue
+        start: int = int(enforce_non_empty_str(pats[:idx].strip()))
+        end: int = int(enforce_non_empty_str(pats[idx + 1:].strip()))
+        sel.extend(range(start - 1, end))
+
+    return sel if len(sel) > 0 else None
+
+
+def split_labels(labels: str | None) -> set[str]:
+    r"""
+    Get a sequence of labels from a string.
+
+    :param labels: the labels string or `None`
+    :return: the labels set
+
+    >>> print(split_labels(None))
+    set()
+    >>> print(split_labels(""))
+    set()
+    >>> print(split_labels(","))
+    set()
+    >>> sorted(split_labels("a;b;d;c"))
+    ['a', 'b', 'c', 'd']
+    >>> sorted(split_labels("a,b c+a;a\td;c"))
+    ['a', 'b', 'c', 'd']
+    """
+    sel: set[str] = set()
+    if labels is None:
+        return sel
+    if not isinstance(labels, str):
+        raise type_error(labels, "labels", (str, None))
+
+    for patf in __SPLT.split(labels):
+        pats: str = patf.strip()
+        if len(pats) <= 0:
+            continue
+        sel.add(pats)
+    return sel
 
 
 def select_lines(code: Iterable[str],
@@ -38,6 +120,8 @@ def select_lines(code: Iterable[str],
     ['def a():', '    b=c', '    return x']
     >>> pc = ["# start x", "def a():", " b=c # -x", "    return x", "# end x"]
     >>> select_lines(pc, labels={"x"})
+    ['def a():', '    return x']
+    >>> select_lines(["def a():", "    b=c", "    return x"], lines=[0, 2])
     ['def a():', '    return x']
     """
     if not isinstance(code, Iterable):

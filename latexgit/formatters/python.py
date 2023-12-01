@@ -13,11 +13,13 @@ import yapf  # type: ignore
 from latexgit.formatters.source_tools import (
     format_empty_lines,
     select_lines,
+    split_labels,
+    split_line_choices,
     strip_common_whitespace_prefix,
 )
 from latexgit.utils.help import argparser
 from latexgit.utils.strings import lines_to_str, str_to_lines
-from latexgit.utils.types import check_to_int_range, type_error
+from latexgit.utils.types import type_error
 
 
 def __no_empty_after(line: str) -> bool:
@@ -359,11 +361,7 @@ if __name__ == "__main__":
     input_lines: Final[list[str]] = sys.stdin.readlines()
     sys.stdout.write(preprocess_python(
         input_lines,
-        None if len(args.lines) <= 0 else [
-            check_to_int_range(s, "line", 1, len(input_lines))
-            for s in args.lines.split(",")],
-        None if len(args.labels) <= 0 else [
-            s.strip() for s in args.labels.split(",")],
-        None if len(args.args) <= 0 else {
-            s.strip() for s in args.args.split(",")}))
+        split_line_choices(args.lines),
+        split_labels(args.labels),
+        split_labels(args.args)))
     sys.stdout.flush()

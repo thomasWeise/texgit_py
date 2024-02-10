@@ -3,11 +3,14 @@ import argparse
 from os.path import dirname, getsize
 from typing import Final
 
+from pycommons.io.arguments import add_version, make_argparser, make_epilog
+from pycommons.io.console import logger
+from pycommons.io.path import Path
+from pycommons.io.streams import write_all
+from pycommons.types import type_error
+
 from latexgit.repository.processed import Processed
-from latexgit.utils.console import logger
-from latexgit.utils.help import argparser
-from latexgit.utils.path import Path
-from latexgit.utils.types import type_error
+from latexgit.version import __version__
 
 
 def __int_to_alpha(index: int) -> str:
@@ -233,7 +236,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     if getsize(aux_file) <= 0:
         logger(f"aux file {aux_file!r} is empty. Nothing to do. Exiting.")
         return
-    lines: Final[list[str]] = aux_file.read_all_list()
+    lines: Final[list[str]] = list(aux_file.open_for_read())
     lenlines: Final[int] = len(lines)
     if lenlines <= 0:
         logger(f"aux file {aux_file!r} contains no lines. "
@@ -273,15 +276,22 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
 
     logger(f"Found and resolved {resolved} file requests.")
     lines.extend(append)
-    aux_file.write_all(lines)
+    with aux_file.open_for_write() as wd:
+        write_all(lines, wd)
     logger(f"Finished flushing {len(lines)} lines to aux file {aux_file!r}.")
 
 
 # Execute the latexgit tool
 if __name__ == "__main__":
-    parser: Final[argparse.ArgumentParser] = argparser(
+    parser: Final[argparse.ArgumentParser] = make_argparser(
         __file__, "Execute the latexgit Tool.",
-        "Download and provide local paths for files from git repositories.")
+        make_epilog(
+            "Download and provide local paths for "
+            "files from git repositories.",
+            2023, None, "Thomas Weise",
+            url="https://thomasweise.github.io/latexgit_py",
+            email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"))
+    add_version(parser, __version__)
     parser.add_argument(
         "aux", help="the aux file to process", type=str, default="")
     parser.add_argument(

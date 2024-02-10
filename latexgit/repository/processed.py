@@ -9,11 +9,12 @@ from shutil import rmtree
 from tempfile import mkstemp
 from typing import Final, Iterable
 
+from pycommons.io.console import logger
+from pycommons.io.path import Path
+from pycommons.processes.shell import exec_text_process
+from pycommons.types import type_error
+
 from latexgit.repository.gitmanager import GitManager
-from latexgit.utils.console import logger
-from latexgit.utils.path import Path
-from latexgit.utils.shell import shell
-from latexgit.utils.types import type_error
 
 
 class Processed(AbstractContextManager):
@@ -106,10 +107,10 @@ class Processed(AbstractContextManager):
         logger(f"will pipe data from {path!r} via {logstr}")
 
         # execute the command
-        ret: Final[str] = shell(
+        ret: Final[str] = exec_text_process(
             command=command, cwd=self.__cache_dir, wants_stdout=True,
             stdin=path.read_all_str())
-        dest.write_all(ret)
+        dest.write_all_str(ret)
 
         logger(f"done piping {len(ret)} characters {logstr}")
         self.__mapped[key] = dest  # remember in cache
@@ -121,7 +122,7 @@ class Processed(AbstractContextManager):
         self.__is_open = False
         if opn:  # only if we were open...
             if len(self.__mapped) > 0:  # we got cached files
-                self.__cache_list.write_all(json.dumps(  # store cache list
+                self.__cache_list.write_all_str(json.dumps(  # store cache
                     list(self.__mapped.items())))
             else:  # no cache files? we can delete cache directory
                 rmtree(self.__cache_dir, ignore_errors=True, onerror=None)

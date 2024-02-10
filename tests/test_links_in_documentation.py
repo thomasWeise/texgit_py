@@ -10,13 +10,12 @@ import certifi
 
 # noinspection PyPackageRequirements
 import urllib3
+from pycommons.io.console import logger
+from pycommons.io.path import Path
+from pycommons.strings.tools import replace_str
 
 # noinspection PyPackageRequirements
 from urllib3.util.url import Url, parse_url
-
-from latexgit.utils.console import logger
-from latexgit.utils.path import Path
-from latexgit.utils.strings import replace_all
 
 #: The hosts that somtimes are unreachable from my local machine.
 #: When the test is executed in a GitHub workflow, all hosts should be
@@ -257,7 +256,7 @@ def check_links_in_file(file: str) -> None:
         rid: str = text[j:k].strip().replace(" ", "-")
         for ch in ".:,()`/":
             rid = rid.replace(ch, "")
-        rid = replace_all("--", "-", rid).lower()
+        rid = replace_str("--", "-", rid).lower()
         if (len(rid) <= 2) or ((rid[0] not in "123456789")
                                and (start > 0)) or ("-" not in rid):
             raise __ve(f"invalid id {rid!r}", text, i)

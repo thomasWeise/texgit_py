@@ -4,8 +4,8 @@ import re
 import sys
 from typing import Callable, Iterable
 
-from latexgit.utils.strings import enforce_non_empty_str
-from latexgit.utils.types import type_error
+from pycommons.strings.enforce import enforce_non_empty_str
+from pycommons.types import type_error
 
 # the split pattern
 __SPLT: re.Pattern = re.compile("[;,+\n\t ]", re.MULTILINE)

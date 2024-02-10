@@ -10,10 +10,11 @@ from os import listdir, rmdir
 from tempfile import mkdtemp
 from typing import Final
 
+from pycommons.io.path import Path
+from pycommons.io.url import normalize_url
+from pycommons.types import type_error
+
 from latexgit.repository.git import GitRepository
-from latexgit.utils.path import Path
-from latexgit.utils.strings import enforce_url
-from latexgit.utils.types import type_error
 
 
 class GitManager:
@@ -45,7 +46,7 @@ class GitManager:
         :param url: the URL to load
         :return: the repository
         """
-        url = enforce_url(url)
+        url = normalize_url(url)
         if url in self.__repos:
             return self.__repos[url]
 

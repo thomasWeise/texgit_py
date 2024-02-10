@@ -3,9 +3,11 @@
 from os.path import dirname
 from typing import Final
 
+from pycommons.io.path import Path
+from pycommons.processes.python import python_command
+from pycommons.processes.shell import exec_text_process
+
 import latexgit.formatters.python as fp
-from latexgit.utils.path import Path
-from latexgit.utils.shell import shell
 
 
 def test_python() -> None:
@@ -13,11 +15,10 @@ def test_python() -> None:
     sf: Final[Path] = Path.file(__file__)
     source: Final[str] = sf.read_all_str()
     wd: Path = Path.directory(dirname(dirname(dirname(sf))))
-    formatted = shell(
-        ["python3", "-m", Path.file(fp.__file__).relative_to(
-            wd).replace("/", ".")[:-3],
-         "--lines", "1-6", "--args", "format"],
-        stdin=source, wants_stdout=True, cwd=wd)
+    call: list[str] = list(python_command(fp.__file__))
+    call.extend(["--lines", "1-6", "--args", "format"])
+    formatted = exec_text_process(
+        call, stdin=source, wants_stdout=True, cwd=wd)
     assert isinstance(formatted, str)
     lines: list[str] = formatted.split("\n")
-    assert len(lines) == 6
+    assert len(lines) == 7

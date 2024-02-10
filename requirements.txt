@@ -19,6 +19,9 @@
 # `latexgit` directly.
 #
 
+# pycommons provides lots of utilites
+pycommons == 0.8.3
+
 # strip-hints is a tool for removing type hints
 strip-hints == 0.1.10
 

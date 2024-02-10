@@ -6,16 +6,16 @@ from shutil import rmtree, which
 from subprocess import TimeoutExpired  # nosec
 from typing import Final, cast
 
-from latexgit.utils.console import logger
-from latexgit.utils.path import Path
-from latexgit.utils.shell import shell
-from latexgit.utils.strings import (
-    datetime_to_datetime_str,
+from pycommons.io.console import logger
+from pycommons.io.path import Path
+from pycommons.io.url import normalize_url
+from pycommons.processes.shell import exec_text_process
+from pycommons.strings.enforce import (
     enforce_non_empty_str,
     enforce_non_empty_str_without_ws,
-    enforce_url,
 )
-from latexgit.utils.types import type_error
+from pycommons.strings.string_conv import datetime_to_datetime_str
+from pycommons.types import type_error
 
 
 def git() -> Path:
@@ -63,7 +63,7 @@ class GitRepository:
             raise type_error(path, "path", Path)
         path.enforce_dir()
         object.__setattr__(self, "path", path)
-        object.__setattr__(self, "url", enforce_url(url))
+        object.__setattr__(self, "url", normalize_url(url))
         object.__setattr__(self, "commit",
                            enforce_non_empty_str_without_ws(commit))
         if len(self.commit) != 40:
@@ -91,23 +91,25 @@ class GitRepository:
         dest: Final[Path] = Path.path(dest_dir)
         gt: Final[Path] = git()
         dest.ensure_dir_exists()
-        url = enforce_url(url)
+        url = normalize_url(url)
         s = f" repository {url!r} to directory {dest!r}"
         logger(f"starting to load{s} via {gt!r}.")
         try:
-            shell([gt, "-C", dest, "clone", "--depth", "1", url, dest],
-                  timeout=600, cwd=dest)
+            exec_text_process([
+                gt, "-C", dest, "clone", "--depth", "1", url, dest],
+                timeout=600, cwd=dest)
         except (TimeoutExpired, ValueError):
             if not url.startswith("https://github.com"):
                 raise
-            url2 = enforce_url(f"ssh://repository@{url[8:]}")
+            url2 = normalize_url(f"ssh://git@{url[8:]}")
             logger(f"timeout when loading url {url!r}, so we try "
                    f"{url2!r} instead, but first delete {dest!r}.")
             rmtree(dest, ignore_errors=True, onerror=None)
             dest.ensure_dir_exists()
             logger(f"{dest!r} deleted and created, now re-trying cloning.")
-            shell([gt, "-C", dest, "clone", "--depth", "1", url2, dest],
-                  timeout=600, cwd=dest)
+            exec_text_process([
+                gt, "-C", dest, "clone", "--depth", "1", url2, dest],
+                timeout=600, cwd=dest)
         logger(f"successfully finished loading{s}.")
 
         return GitRepository.from_local(path=dest, url=url)
@@ -127,7 +129,7 @@ class GitRepository:
 
         logger(
             f"checking commit information of repo {dest!r} via {gt!r}.")
-        stdout: str = enforce_non_empty_str(shell(
+        stdout: str = enforce_non_empty_str(exec_text_process(
             [gt, "-C", dest, "log", "--no-abbrev-commit", "-1"],
             timeout=120, cwd=dest, wants_stdout=True))
 
@@ -152,7 +154,7 @@ class GitRepository:
 
         if url is None:
             logger(f"applying {gt!r} to get url information.")
-            url = enforce_non_empty_str(shell(
+            url = enforce_non_empty_str(exec_text_process(
                 [gt, "-C", dest, "config", "--get", "remote.origin.url"],
                 timeout=120, cwd=dest, wants_stdout=True))
             url = enforce_non_empty_str_without_ws(
@@ -179,7 +181,7 @@ class GitRepository:
             base_url = f"https://{enforce_non_empty_str(base_url[10:])}"
         if base_url_lower.endswith(".git"):
             base_url = enforce_non_empty_str(base_url[:-4])
-        return enforce_url(base_url)
+        return normalize_url(base_url)
 
     def make_url(self, relative_path: str) -> str:
         """
@@ -198,7 +200,7 @@ class GitRepository:
             base_url = f"{base_url}/blob/{self.commit}/{path}"
         else:
             base_url = f"{base_url}/{path}"
-        return enforce_url(base_url)
+        return normalize_url(base_url)
 
     def get_name(self) -> str:
         """

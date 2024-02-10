@@ -3,9 +3,10 @@
 
 from typing import Final
 
+from pycommons.io.path import Path
+from pycommons.io.temp import TempDir
+
 from latexgit.repository.processed import Processed
-from latexgit.utils.path import Path
-from latexgit.utils.temp import TempDir
 
 
 def test_processed() -> None:
@@ -26,19 +27,19 @@ def test_processed() -> None:
         file_2, url_2 = proc.get_file_and_url(
             "https://github.com/thomasWeise/moptipy",
             "moptipy/api/operators.py",
-            ("head", "-n", 5))
+            ("head", "-n", "5"))
         assert isinstance(file_2, Path)
         assert isinstance(url_2, str)
         file_2.enforce_file()
         assert file_2 != file_1
         assert url_2 == url_1
         td.enforce_contains(file_2)
-        assert len(file_2.read_all_list()) == 5
+        assert len(list(file_2.open_for_read())) == 5
 
         file_3, url_3 = proc.get_file_and_url(
             "https://github.com/thomasWeise/moptipy",
             "moptipy/api/operators.py",
-            ("head", "-n", 5))
+            ("head", "-n", "5"))
         assert isinstance(file_3, Path)
         assert file_3 == file_2
         assert isinstance(url_3, str)

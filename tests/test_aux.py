@@ -2,8 +2,10 @@
 
 from typing import Final
 
+from pycommons.io.streams import write_all
+from pycommons.io.temp import TempDir, TempFile
+
 from latexgit.aux import REQUEST, RESPONSE_PATH, RESPONSE_URL, run
-from latexgit.utils.temp import TempDir, TempFile
 
 
 def test_aux() -> None:
@@ -17,10 +19,11 @@ def test_aux() -> None:
             f"{REQUEST} {{{mrepo}}}{{LICENSE}}{{}}",
             f"{REQUEST} {{{mrepo}}}{{Makefile}}{{sort}}",
             r"\gdef \@abspage@last{1}"]
-        tf.write_all(txt)
+        with tf.open_for_write() as wd:
+            write_all(txt, wd)
 
         run(tf)
-        got_1 = tf.read_all_list()
+        got_1 = list(tf.open_for_read())
 
         assert len(got_1) == (len(txt) + 6)
         assert len([s for s in got_1 if s.startswith(
@@ -28,8 +31,9 @@ def test_aux() -> None:
         assert len([s for s in got_1 if s.startswith(
             f"\\xdef{RESPONSE_URL}")]) == 3
 
-        tf.write_all(txt)
+        with tf.open_for_write() as wd:
+            write_all(txt, wd)
         run(tf)
-        got_2 = tf.read_all_list()
+        got_2 = list(tf.open_for_read())
 
         assert got_1 == got_2

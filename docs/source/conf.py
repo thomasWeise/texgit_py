@@ -114,7 +114,8 @@ extensions = ['myst_parser',  # for processing README.md
 
 # Location of dependency documentation for cross-referencing.
 intersphinx_mapping = {
-    'python': ("https://docs.python.org/3/", None),
+    "python": ("https://docs.python.org/3/", None),
+    "pycommons": ("https://thomasweise.github.io/pycommons/", None),
 }
 
 # inherit docstrings in autodoc

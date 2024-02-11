@@ -8,7 +8,7 @@ from typing import Final, cast
 
 from pycommons.io.console import logger
 from pycommons.io.path import Path
-from pycommons.io.url import normalize_url
+from pycommons.net.url import normalize_url
 from pycommons.processes.shell import exec_text_process
 from pycommons.strings.enforce import (
     enforce_non_empty_str,

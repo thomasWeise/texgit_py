@@ -11,7 +11,7 @@ from tempfile import mkdtemp
 from typing import Final
 
 from pycommons.io.path import Path
-from pycommons.io.url import normalize_url
+from pycommons.net.url import normalize_url
 from pycommons.types import type_error
 
 from latexgit.repository.git import GitRepository

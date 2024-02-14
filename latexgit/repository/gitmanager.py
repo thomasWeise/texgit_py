@@ -10,7 +10,7 @@ from os import listdir, rmdir
 from tempfile import mkdtemp
 from typing import Final
 
-from pycommons.io.path import Path
+from pycommons.io.path import Path, directory_path
 from pycommons.net.url import normalize_url
 from pycommons.types import type_error
 
@@ -27,7 +27,7 @@ class GitManager:
         :param base_dir: the base directory
         """
         #: the base directory of the repository manager
-        self.base_dir: Final[Path] = Path.path(base_dir)
+        self.base_dir: Final[Path] = Path(base_dir)
         self.base_dir.ensure_dir_exists()
         #: the internal set of github repositories
         self.__repos: Final[dict[str, GitRepository]] = {}
@@ -50,7 +50,7 @@ class GitManager:
         if url in self.__repos:
             return self.__repos[url]
 
-        dirpath: Final[Path] = Path.directory(mkdtemp(
+        dirpath: Final[Path] = directory_path(mkdtemp(
             dir=self.base_dir, prefix="git_"))
         try:
             gt: Final[GitRepository] = GitRepository.download(url, dirpath)

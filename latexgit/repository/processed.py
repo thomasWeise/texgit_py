@@ -10,7 +10,7 @@ from tempfile import mkstemp
 from typing import Final, Iterable
 
 from pycommons.io.console import logger
-from pycommons.io.path import Path
+from pycommons.io.path import Path, file_path
 from pycommons.processes.shell import exec_text_process
 from pycommons.types import type_error
 
@@ -30,7 +30,7 @@ class Processed(AbstractContextManager):
         self.__is_open: bool = True
 
         #: the base path of the processor
-        self.base_path: Final[Path] = Path.path(base_dir)
+        self.base_path: Final[Path] = Path(base_dir)
         self.base_path.ensure_dir_exists()
 
         #: the internal repository manager
@@ -55,10 +55,10 @@ class Processed(AbstractContextManager):
             s = self.__cache_list.read_all_str()
             if len(s) > 0:  # load all cached mappings
                 for key, value in json.loads(s):
-                    pt1: Path = Path.path(key[0])
+                    pt1: Path = Path(key[0])
                     if not pt1.is_file():
                         continue
-                    pt2: Path = Path.path(value)
+                    pt2: Path = Path(value)
                     if not pt2.is_file():
                         continue
                     self.__mapped[(pt1, tuple(key[1]))] = pt2
@@ -102,7 +102,7 @@ class Processed(AbstractContextManager):
         # not in cache: create new file and apply post processing
         (handle, fpath) = mkstemp(prefix="proc_", dir=self.__cache_dir)
         os.close(handle)
-        dest: Final[Path] = Path.file(fpath)
+        dest: Final[Path] = file_path(fpath)
         logstr = f"from {logstr} to {dest!r}"
         logger(f"will pipe data from {path!r} via {logstr}")
 

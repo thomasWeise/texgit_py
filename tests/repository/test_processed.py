@@ -4,14 +4,14 @@
 from typing import Final
 
 from pycommons.io.path import Path
-from pycommons.io.temp import TempDir
+from pycommons.io.temp import temp_dir
 
 from latexgit.repository.processed import Processed
 
 
 def test_processed() -> None:
     """Test the processed files repository."""
-    with (TempDir.create() as td):
+    with temp_dir() as td:
         proc: Final[Processed] = Processed(td)
 
         file_1, url_1 = proc.get_file_and_url(

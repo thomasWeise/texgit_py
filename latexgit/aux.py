@@ -5,8 +5,7 @@ from typing import Final
 
 from pycommons.io.arguments import add_version, make_argparser, make_epilog
 from pycommons.io.console import logger
-from pycommons.io.path import Path
-from pycommons.io.streams import write_all
+from pycommons.io.path import Path, directory_path, write_lines
 from pycommons.types import type_error
 
 from latexgit.repository.processed import Processed
@@ -192,8 +191,9 @@ def __make_response(
 
     >>> from os.path import dirname
     >>> import latexgit.aux as aa
-    >>> fle = Path.file(aa.__file__)
-    >>> bd = Path.directory(dirname(dirname(fle)))
+    >>> from pycommons.io.path import file_path
+    >>> fle = file_path(aa.__file__)
+    >>> bd = directory_path(dirname(dirname(fle)))
     >>> x = __make_response(bd, (fle, 'https://example.com'), 3)
     >>> x[0]
     '\\xdef\\@latexgit@pathd{latexgit/aux.py}%'
@@ -225,9 +225,9 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     :param aux_arg: the `aux` file argument
     :param repo_dir_arg: the repository directory argument
     """
-    aux_file: Path = Path.path(aux_arg)
+    aux_file: Path = Path(aux_arg)
     if not aux_file.is_file():
-        aux_file = Path.path(f"{aux_arg}.aux")
+        aux_file = Path(f"{aux_arg}.aux")
     if not aux_file.is_file():
         raise ValueError(f"aux argument {aux_arg!r} does not identify a file "
                          f"and neither does {aux_file!r}")
@@ -244,7 +244,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     else:
         logger(f"Loaded {lenlines} lines from aux file {aux_file!r}.")
 
-    base_dir: Final[Path] = Path.directory(dirname(aux_file))
+    base_dir: Final[Path] = directory_path(dirname(aux_file))
     logger(f"The base directory is {base_dir!r}.")
 
     proc: Processed | None = None
@@ -277,7 +277,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     logger(f"Found and resolved {resolved} file requests.")
     lines.extend(append)
     with aux_file.open_for_write() as wd:
-        write_all(lines, wd)
+        write_lines(map(str.rstrip, lines), wd)
     logger(f"Finished flushing {len(lines)} lines to aux file {aux_file!r}.")
 
 

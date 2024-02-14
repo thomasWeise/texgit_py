@@ -10,7 +10,6 @@ from typing import Final, Iterable
 import strip_hints as sh  # type: ignore
 import yapf  # type: ignore
 from pycommons.io.arguments import add_version, make_argparser, make_epilog
-from pycommons.strings.tools import join_str, split_str
 from pycommons.types import type_error
 
 from latexgit.formatters.source_tools import (
@@ -144,7 +143,7 @@ def __strip_hints(
         if t2.startswith("#") and (not t1.startswith("#")) \
                 and t2.endswith(t1):
             del new_lines[i]
-    return join_str(new_lines, trailing_sep=False)
+    return "\n".join(map(str.rstrip, new_lines))
 
 
 def __strip_docstrings_and_comments(code: str,
@@ -258,7 +257,7 @@ def format_python(code: Iterable[str],
         if len(rcode) <= 0:
             raise ValueError("Code becomes empty.")
 
-        text = join_str(rcode)
+        text = "\n".join(map(str.rstrip, rcode))
         new_len: tuple[int, int] = (text.count("\n"), len(text))
         if not_first_run and (old_len <= new_len):
             break
@@ -283,7 +282,7 @@ def format_python(code: Iterable[str],
         if not_first_run and (old_len <= new_len):
             break
 
-        rcode = list(split_str(text))
+        rcode = list(map(str.rstrip, text.splitlines()))
         shortest = rcode
         old_len = new_len
         not_first_run = True
@@ -323,21 +322,26 @@ def preprocess_python(code: list[str],
     # set up arguments
     strip_docstrings: bool = True
     strip_comments: bool = True
-    strip_hints: bool = True
+    strip_hintx: bool = True
     do_format: bool = True
     if params is not None:
         do_format = "format" not in params
         strip_docstrings = "doc" not in params
         strip_comments = "comments" not in params
-        strip_hints = "hints" not in params
+        strip_hintx = "hints" not in params
 
     if do_format:
-        return join_str(format_python(keep_lines,
-                                      strip_docstrings=strip_docstrings,
-                                      strip_comments=strip_comments,
-                                      strip_hints=strip_hints),
-                        trailing_sep=True)
-    return join_str(keep_lines, trailing_sep=True)
+        keep_lines = format_python(keep_lines,
+                                   strip_docstrings=strip_docstrings,
+                                   strip_comments=strip_comments,
+                                   strip_hints=strip_hintx)
+
+    while (len(keep_lines) > 0) and (keep_lines[-1] == ""):
+        del keep_lines[-1]
+
+    if (len(keep_lines) == 0) or (keep_lines[-1] != ""):
+        keep_lines.append("")
+    return "\n".join(map(str.rstrip, keep_lines))
 
 
 # Execute the formatter as script

@@ -1,5 +1,4 @@
 """Test all the links in the project's *.md files."""
-import os.path
 from os import environ
 from random import choice
 from time import sleep
@@ -11,7 +10,7 @@ import certifi
 # noinspection PyPackageRequirements
 import urllib3
 from pycommons.io.console import logger
-from pycommons.io.path import Path
+from pycommons.io.path import file_path
 from pycommons.strings.tools import replace_str
 
 # noinspection PyPackageRequirements
@@ -206,9 +205,8 @@ def check_links_in_file(file: str) -> None:
     :param file: the file to check
     """
     # First, we load the file as a single string
-    base_dir = Path.directory(os.path.join(os.path.dirname(__file__),
-                                           "../"))
-    readme = Path.file(base_dir.resolve_inside(file))
+    base_dir = file_path(__file__).up(2)
+    readme = file_path(base_dir.resolve_inside(file))
     logger(f"testing all links from the {file!r} file {readme!r}.")
     text = readme.read_all_str()
     logger(f"got {len(text)} characters.")

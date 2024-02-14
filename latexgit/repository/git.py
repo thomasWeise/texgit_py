@@ -7,7 +7,7 @@ from subprocess import TimeoutExpired  # nosec
 from typing import Final, cast
 
 from pycommons.io.console import logger
-from pycommons.io.path import Path
+from pycommons.io.path import Path, file_path
 from pycommons.net.url import normalize_url
 from pycommons.processes.shell import exec_text_process
 from pycommons.strings.enforce import (
@@ -32,7 +32,7 @@ def git() -> Path:
     path: str | None = which("git")
     if path is None:
         raise ValueError("Could not find 'repository' installation.")
-    result: Final[Path] = Path.file(path)
+    result: Final[Path] = file_path(path)
     setattr(obj, attr, result)
     return result
 
@@ -88,7 +88,7 @@ class GitRepository:
         :param dest_dir: the destination directory
         :return: the repository information
         """
-        dest: Final[Path] = Path.path(dest_dir)
+        dest: Final[Path] = Path(dest_dir)
         gt: Final[Path] = git()
         dest.ensure_dir_exists()
         url = normalize_url(url)
@@ -123,7 +123,7 @@ class GitRepository:
         :param url: the url
         :return: the repository information
         """
-        dest: Final[Path] = Path.path(path)
+        dest: Final[Path] = Path(path)
         gt: Final[str] = git()
         dest.enforce_dir()
 

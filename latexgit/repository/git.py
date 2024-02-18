@@ -8,7 +8,7 @@ from typing import Final, cast
 
 from pycommons.io.console import logger
 from pycommons.io.path import Path, file_path
-from pycommons.net.url import normalize_url
+from pycommons.net.url import URL
 from pycommons.processes.shell import exec_text_process
 from pycommons.strings.enforce import (
     enforce_non_empty_str,
@@ -63,7 +63,7 @@ class GitRepository:
             raise type_error(path, "path", Path)
         path.enforce_dir()
         object.__setattr__(self, "path", path)
-        object.__setattr__(self, "url", normalize_url(url))
+        object.__setattr__(self, "url", URL(url))
         object.__setattr__(self, "commit",
                            enforce_non_empty_str_without_ws(commit))
         if len(self.commit) != 40:
@@ -91,7 +91,7 @@ class GitRepository:
         dest: Final[Path] = Path(dest_dir)
         gt: Final[Path] = git()
         dest.ensure_dir_exists()
-        url = normalize_url(url)
+        url = URL(url)
         s = f" repository {url!r} to directory {dest!r}"
         logger(f"starting to load{s} via {gt!r}.")
         try:
@@ -101,7 +101,7 @@ class GitRepository:
         except (TimeoutExpired, ValueError):
             if not url.startswith("https://github.com"):
                 raise
-            url2 = normalize_url(f"ssh://git@{url[8:]}")
+            url2 = URL(f"ssh://git@{url[8:]}")
             logger(f"timeout when loading url {url!r}, so we try "
                    f"{url2!r} instead, but first delete {dest!r}.")
             rmtree(dest, ignore_errors=True, onerror=None)
@@ -181,7 +181,7 @@ class GitRepository:
             base_url = f"https://{enforce_non_empty_str(base_url[10:])}"
         if base_url_lower.endswith(".git"):
             base_url = enforce_non_empty_str(base_url[:-4])
-        return normalize_url(base_url)
+        return URL(base_url)
 
     def make_url(self, relative_path: str) -> str:
         """
@@ -200,7 +200,7 @@ class GitRepository:
             base_url = f"{base_url}/blob/{self.commit}/{path}"
         else:
             base_url = f"{base_url}/{path}"
-        return normalize_url(base_url)
+        return URL(base_url)
 
     def get_name(self) -> str:
         """

@@ -37,9 +37,7 @@ clean: status
 	rm -rf build && \
 	rm -rf dist && \
 	rm -rf docs/build && \
-	mv docs/source/index.rst docs/source/index.x && \
 	rm -rf docs/source/*.rst && \
-	mv docs/source/index.x docs/source/index.rst && \
 	rm -rf latexgit.egg-info && \
 	echo "$(NOW): Done cleaning up, latexgit is uninstalled and auto-generated stuff is deleted."
 
@@ -121,10 +119,8 @@ create_documentation: static_analysis test
 	echo "$(NOW): Now creating the documentation build folder and building the documentation." && \
 	sphinx-build -W -a -E -b html docs/source docs/build && \
 	echo "$(NOW): Done creating HTML documentation, cleaning up documentation temp files." && \
-	mv docs/source/index.rst docs/source/index.tmp && \
 	rm -rf docs/source/*.rst && \
 	rm -rf docs/source/*.md && \
-	mv docs/source/index.tmp docs/source/index.rst && \
 	echo "$(NOW): Now copying LICENSE and other files." &&\
 	pygmentize -f html -l text -O full -O style=default -o docs/build/LICENSE.html LICENSE &&\
 	pygmentize -f html -l text -O full -O style=default -o docs/build/requirements.html requirements.txt &&\

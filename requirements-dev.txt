@@ -32,6 +32,9 @@
 # `latexgit` build process.
 #
 
+# pycommons provides lots of utilities
+pycommons[dev] >= 0.8.8
+
 # We need pytest to run the unit tests.
 # Unit tests test components of our package, e.g., functions or objects, and
 # compare their behavior with the expected behaviors in some test cases.

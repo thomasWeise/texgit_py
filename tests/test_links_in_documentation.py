@@ -1,7 +1,7 @@
 """Test all the links in the project's *.md files."""
 
+from pycommons.dev.tests.links_in_md import check_links_in_md
 from pycommons.io.path import file_path
-from pycommons.tests.links_in_md import check_links_in_md
 
 
 def test_all_links_in_readme_md() -> None:

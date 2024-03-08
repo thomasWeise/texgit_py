@@ -33,7 +33,7 @@
 #
 
 # pycommons provides lots of utilities
-pycommons[dev] >= 0.8.9
+pycommons[dev] >= 0.8.11
 
 # We need pytest to run the unit tests.
 # Unit tests test components of our package, e.g., functions or objects, and

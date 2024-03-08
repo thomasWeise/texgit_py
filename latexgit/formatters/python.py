@@ -9,7 +9,7 @@ from typing import Final, Iterable
 
 import strip_hints as sh  # type: ignore
 import yapf  # type: ignore
-from pycommons.io.arguments import add_version, make_argparser, make_epilog
+from pycommons.io.arguments import make_argparser, make_epilog
 from pycommons.types import type_error
 
 from latexgit.formatters.source_tools import (
@@ -352,8 +352,8 @@ if __name__ == "__main__":
             "Format Python code received via stdin, write it to stdout.",
             2023, None, "Thomas Weise",
             url="https://thomasweise.github.io/latexgit_py",
-            email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"))
-    add_version(parser, __version__)
+            email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"),
+        __version__)
     parser.add_argument(
         "--lines", help="a comma-separated list of selected lines",
         type=str, default="", nargs="?")

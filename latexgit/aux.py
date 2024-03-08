@@ -3,7 +3,7 @@ import argparse
 from os.path import dirname, getsize
 from typing import Final
 
-from pycommons.io.arguments import add_version, make_argparser, make_epilog
+from pycommons.io.arguments import make_argparser, make_epilog
 from pycommons.io.console import logger
 from pycommons.io.path import Path, directory_path, write_lines
 from pycommons.types import type_error
@@ -290,8 +290,8 @@ if __name__ == "__main__":
             "files from git repositories.",
             2023, None, "Thomas Weise",
             url="https://thomasweise.github.io/latexgit_py",
-            email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"))
-    add_version(parser, __version__)
+            email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"),
+        __version__)
     parser.add_argument(
         "aux", help="the aux file to process", type=str, default="")
     parser.add_argument(

@@ -3,13 +3,12 @@ import datetime
 import re
 from dataclasses import dataclass
 from shutil import rmtree, which
-from subprocess import TimeoutExpired  # nosec
 from typing import Final, cast
 
 from pycommons.io.console import logger
 from pycommons.io.path import Path, file_path
 from pycommons.net.url import URL
-from pycommons.processes.shell import exec_text_process
+from pycommons.processes.shell import STREAM_CAPTURE, Command
 from pycommons.strings.enforce import (
     enforce_non_empty_str,
     enforce_non_empty_str_without_ws,
@@ -95,10 +94,10 @@ class GitRepository:
         s = f" repository {url!r} to directory {dest!r}"
         logger(f"starting to load{s} via {gt!r}.")
         try:
-            exec_text_process([
+            Command([
                 gt, "-C", dest, "clone", "--depth", "1", url, dest],
-                timeout=600, cwd=dest)
-        except (TimeoutExpired, ValueError):
+                timeout=600, working_dir=dest).execute(True)
+        except ValueError:
             if not url.startswith("https://github.com"):
                 raise
             url2 = URL(f"ssh://git@{url[8:]}")
@@ -107,9 +106,9 @@ class GitRepository:
             rmtree(dest, ignore_errors=True, onerror=None)
             dest.ensure_dir_exists()
             logger(f"{dest!r} deleted and created, now re-trying cloning.")
-            exec_text_process([
+            Command([
                 gt, "-C", dest, "clone", "--depth", "1", url2, dest],
-                timeout=600, cwd=dest)
+                timeout=600, working_dir=dest).execute(True)
         logger(f"successfully finished loading{s}.")
 
         return GitRepository.from_local(path=dest, url=url)
@@ -129,9 +128,10 @@ class GitRepository:
 
         logger(
             f"checking commit information of repo {dest!r} via {gt!r}.")
-        stdout: str = enforce_non_empty_str(exec_text_process(
+        stdout: str = enforce_non_empty_str(Command(
             [gt, "-C", dest, "log", "--no-abbrev-commit", "-1"],
-            timeout=120, cwd=dest, wants_stdout=True))
+            timeout=120, working_dir=dest, stdout=STREAM_CAPTURE).execute(
+            True)[0])
 
         match = re.search("^\\s*commit\\s+(.+?)\\s+", stdout,
                           flags=re.MULTILINE)
@@ -154,9 +154,10 @@ class GitRepository:
 
         if url is None:
             logger(f"applying {gt!r} to get url information.")
-            url = enforce_non_empty_str(exec_text_process(
+            url = enforce_non_empty_str(Command(
                 [gt, "-C", dest, "config", "--get", "remote.origin.url"],
-                timeout=120, cwd=dest, wants_stdout=True))
+                timeout=120, working_dir=dest, stdout=STREAM_CAPTURE)
+                .execute(True)[0])
             url = enforce_non_empty_str_without_ws(
                 url.strip().split("\n")[0].strip())
             if url.endswith("/.git"):

@@ -11,7 +11,7 @@ from typing import Final, Iterable
 
 from pycommons.io.console import logger
 from pycommons.io.path import Path, file_path
-from pycommons.processes.shell import exec_text_process
+from pycommons.processes.shell import STREAM_CAPTURE, Command
 from pycommons.types import type_error
 
 from latexgit.repository.gitmanager import GitManager
@@ -107,9 +107,10 @@ class Processed(AbstractContextManager):
         logger(f"will pipe data from {path!r} via {logstr}")
 
         # execute the command
-        ret: Final[str] = exec_text_process(
-            command=command, cwd=self.__cache_dir, wants_stdout=True,
-            stdin=path.read_all_str())
+        ret: Final[str] = Command(
+            command=command, working_dir=self.__cache_dir,
+            stdout=STREAM_CAPTURE, stdin=path.read_all_str()).execute(
+            True)[0]
         dest.write_all_str(ret)
 
         logger(f"done piping {len(ret)} characters {logstr}")

@@ -30,7 +30,7 @@ You can install the newest version of this library from PyPi using [`pip`](https
 pip install latexgit
 ```
 
-This will install the latest official release of our package as well as [all dependencies](https://thomasweise.github.io/latexgit_py/requirements.html).
+This will install the latest official release of our package as well as [all dependencies](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/requirements_txt.html).
 If you want to install the latest source code version from GitHub (which may not yet be officially released), you can do
 
 ```shell
@@ -46,13 +46,13 @@ pip install latexgit_py
 
 This may sometimes work better if you are having trouble reaching GitHub via `https` or `http`.
 
-You can also clone the repository and then run a [`make` build](https://thomasweise.github.io/latexgit_py/Makefile.html), which will automatically install all dependencies, run all the tests, and then install the package on your system, too.
+You can also clone the repository and then run a [`make` build](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/Makefile.html), which will automatically install all dependencies, run all the tests, and then install the package on your system, too.
 This will work only on Linux, though.
-It also installs the [dependencies for building](https://thomasweise.github.io/latexgit_py/requirements-dev.html), which include, e.g., those for unit testing and static analysis.
+It also installs the [dependencies for building](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/requirements-dev_txt.html), which include, e.g., those for unit testing and static analysis.
 If this build completes successful, you can be sure that [`latexgit`](https://thomasweise.github.io/latexgit_py) will work properly on your machine.
 
-All dependencies for using and running `latexgit` are listed at [here](https://thomasweise.github.io/latexgit_py/requirements.html).
-The additional dependencies for a [full `make` build](https://thomasweise.github.io/latexgit_py/Makefile.html), including unit tests, static analysis, and the generation of documentation are listed [here](https://thomasweise.github.io/latexgit_py/requirements-dev.html).
+All dependencies for using and running `latexgit` are listed at [here](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/requirements_txt.html).
+The additional dependencies for a [full `make` build](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/Makefile.html), including unit tests, static analysis, and the generation of documentation are listed [here](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/requirements-dev_txt.html).
 
 
 ## 3. License
@@ -63,7 +63,7 @@ Copyright (C) 2023  [Thomas Weise](http://iao.hfuu.edu.cn/5) (汤卫思教授)
 
 Dr. Thomas Weise (see [Contact](#4-contact)) holds the copyright of this package.
 
-`latexgit` is provided to the public as open source software under the [GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007](https://thomasweise.github.io/latexgit_py/LICENSE.html).
+`latexgit` is provided to the public as open source software under the [GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/LICENSE.html).
 Terms for other licenses, e.g., for specific industrial applications, can be negotiated with Dr. Thomas Weise (who can be reached via the [contact information](#4-contact) below).
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -71,8 +71,8 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 You should have received a copy of the GNU General Public License along with this program.
 If not, see <https://www.gnu.org/licenses/>.
 
-Please visit the [contributions guidelines](https://thomasweise.github.io/latexgit_py/CONTRIBUTING.html) for `latexgit` if you would like to contribute to our package.
-If you have any concerns regarding security, please visit our [security policy](https://thomasweise.github.io/latexgit_py/SECURITY.html).
+Please visit the [contributions guidelines](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/CONTRIBUTING_md.html) for `latexgit` if you would like to contribute to our package.
+If you have any concerns regarding security, please visit our [security policy](https://thomasweise.github.io/latexgit_py)https://thomasweise.github.io/latexgit_py/SECURITY_md.html).
 
 
 ## 4. Contact

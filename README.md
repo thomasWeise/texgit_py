@@ -1,4 +1,4 @@
-[![make build](https://github.com/thomasWeise/latexgit_py/actions/workflows/build.yaml/badge.svg)](https://github.com/thomasWeise/latexgit_py/actions/workflows/build.yaml)
+[![make build](https://github.com/thomasWeise/latexgit_py/actions/workflows/build.yml/badge.svg)](https://github.com/thomasWeise/latexgit_py/actions/workflows/build.yml)
 [![pypi version](https://img.shields.io/pypi/v/latexgit)](https://pypi.org/project/latexgit)
 [![pypi downloads](https://img.shields.io/pypi/dw/latexgit.svg)](https://pypistats.org/packages/latexgit)
 [![coverage report](https://thomasweise.github.io/latexgit_py/tc/badge.svg)](https://thomasweise.github.io/latexgit_py/tc/index.html)

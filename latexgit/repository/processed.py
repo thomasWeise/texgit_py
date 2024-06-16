@@ -126,7 +126,7 @@ class Processed(AbstractContextManager):
                 self.__cache_list.write_all_str(json.dumps(  # store cache
                     list(self.__mapped.items())))
             else:  # no cache files? we can delete cache directory
-                rmtree(self.__cache_dir, ignore_errors=True, onerror=None)
+                rmtree(self.__cache_dir, ignore_errors=True)
 
     def __exit__(self, exception_type, _, __) -> bool:
         """

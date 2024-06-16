@@ -103,7 +103,7 @@ class GitRepository:
             url2 = URL(f"ssh://git@{url[8:]}")
             logger(f"timeout when loading url {url!r}, so we try "
                    f"{url2!r} instead, but first delete {dest!r}.")
-            rmtree(dest, ignore_errors=True, onerror=None)
+            rmtree(dest, ignore_errors=True)
             dest.ensure_dir_exists()
             logger(f"{dest!r} deleted and created, now re-trying cloning.")
             Command([

@@ -33,11 +33,22 @@ class GitManager:
         self.__repos: Final[dict[str, GitRepository]] = {}
 
         #: load all the repository repositories
-        for thedir in listdir(self.base_dir):
-            fullpath = self.base_dir.resolve_inside(thedir)
+        for the_dir in listdir(self.base_dir):
+            fullpath = self.base_dir.resolve_inside(the_dir)
             if fullpath.is_dir() and fullpath.resolve_inside(".git").is_dir():
                 gr: GitRepository = GitRepository.from_local(fullpath)
                 self.__repos[gr.url] = gr
+
+    def is_repo_subdir(self, path: Path) -> bool:
+        """
+        Check if the given path identifies a directory inside a repository.
+
+        :param path: the path
+        :return: `True` if `path` identifies a directory located in a
+            repository.
+        """
+        return path.is_dir() and any(repo.path.contains(
+            path) for repo in self.__repos.values())
 
     def get_repo(self, url: str) -> GitRepository:
         """

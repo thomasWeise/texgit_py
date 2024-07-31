@@ -1,7 +1,6 @@
 """Test the processed generated git files repository."""
 
 
-
 from pycommons.io.path import Path
 from pycommons.io.temp import temp_dir
 

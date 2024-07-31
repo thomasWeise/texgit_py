@@ -1,6 +1,5 @@
 """A post-processed representation of repository files."""
 
-
 import json
 import os
 from contextlib import AbstractContextManager

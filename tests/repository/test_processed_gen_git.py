@@ -45,3 +45,14 @@ def test_processed_gen_git() -> None:
         assert isinstance(file_1b, Path)
         assert file_1b.is_file()
         assert file_1b == file_1
+
+        file_4, u4 = proc.get_output(
+            ("python3", "examples/temp.py"),
+            "https://github.com/thomasWeise/pycommons",
+            ".")
+        assert isinstance(file_4, Path)
+        assert isinstance(u4, URL)
+        assert f"{u4}" == "https://github.com/thomasWeise/pycommons"
+        td.enforce_contains(file_4)
+        file_4.enforce_file()
+        assert file_4.is_file()

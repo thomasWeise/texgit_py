@@ -19,7 +19,8 @@ def test_processed_git() -> None:
         assert isinstance(url_1, str)
         file_1.enforce_file()
         td.enforce_contains(file_1)
-        assert url_1.startswith("https://github.com/thomasWeise/moptipy/blob/")
+        assert url_1.startswith(
+            "https://github.com/thomasWeise/moptipy/blob/")
         assert url_1.endswith("/moptipy/api/operators.py")
 
         file_2, url_2 = proc.get_file_and_url(
@@ -62,7 +63,8 @@ def test_processed_git() -> None:
         assert isinstance(url_1b, str)
         file_1b.enforce_file()
         td.enforce_contains(file_1b)
-        assert url_1b.startswith("https://github.com/thomasWeise/moptipy/blob/")
+        assert url_1b.startswith(
+            "https://github.com/thomasWeise/moptipy/blob/")
         assert url_1b.endswith("/moptipy/api/operators.py")
         assert file_1 == file_1b
         assert url_1 == url_1b

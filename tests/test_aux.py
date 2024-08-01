@@ -5,7 +5,13 @@ from typing import Final
 from pycommons.io.path import write_lines
 from pycommons.io.temp import temp_dir, temp_file
 
-from latexgit.aux import REQUEST, RESPONSE_PATH, RESPONSE_URL, run
+from latexgit.aux import (
+    REQUEST_FILE,
+    REQUEST_PROCESS,
+    RESPONSE_PATH,
+    RESPONSE_URL,
+    run,
+)
 
 
 def test_aux() -> None:
@@ -15,9 +21,10 @@ def test_aux() -> None:
           temp_file(td, suffix=".aux") as tf):
         txt = [
             r"\relax",
-            f"{REQUEST} {{{mrepo}}}{{README.md}}{{head -n 5}}",
-            f"{REQUEST} {{{mrepo}}}{{LICENSE}}{{}}",
-            f"{REQUEST} {{{mrepo}}}{{Makefile}}{{sort}}",
+            f"{REQUEST_FILE} {{{mrepo}}}{{README.md}}{{head -n 5}}",
+            f"{REQUEST_FILE} {{{mrepo}}}{{LICENSE}}{{}}",
+            f"{REQUEST_FILE} {{{mrepo}}}{{Makefile}}{{sort}}",
+            f"{REQUEST_PROCESS}{{}}{{}}{{python3 --version}}",
             r"\gdef \@abspage@last{1}"]
         with tf.open_for_write() as wd:
             write_lines(txt, wd)
@@ -25,11 +32,11 @@ def test_aux() -> None:
         run(tf)
         got_1 = list(tf.open_for_read())
 
-        assert len(got_1) == (len(txt) + 6)
+        assert len(got_1) == (len(txt) + 8)
         assert len([s for s in got_1 if s.startswith(
-            f"\\xdef{RESPONSE_PATH}")]) == 3
+            f"\\xdef{RESPONSE_PATH}")]) == 4
         assert len([s for s in got_1 if s.startswith(
-            f"\\xdef{RESPONSE_URL}")]) == 3
+            f"\\xdef{RESPONSE_URL}")]) == 4
 
         with tf.open_for_write() as wd:
             write_lines(txt, wd)

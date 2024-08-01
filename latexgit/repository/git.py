@@ -43,7 +43,7 @@ class GitRepository:
     #: the repository path
     path: Path
     #: the repository url
-    url: str
+    url: URL
     #: the commit
     commit: str
     #: the date and time
@@ -176,15 +176,15 @@ class GitRepository:
 
         :return: the base url of this git repository
         """
-        base_url = self.url
-        base_url_lower = base_url.lower()
+        base_url: str = self.url
+        base_url_lower: str = base_url.lower()
         if base_url_lower.startswith("ssh://git@github."):
             base_url = f"https://{enforce_non_empty_str(base_url[10:])}"
         if base_url_lower.endswith(".git"):
             base_url = enforce_non_empty_str(base_url[:-4])
         return URL(base_url)
 
-    def make_url(self, relative_path: str) -> str:
+    def make_url(self, relative_path: str) -> URL:
         """
         Make an url relative to this git repository.
 
@@ -209,10 +209,10 @@ class GitRepository:
 
         :return: the name of this git repository in the form 'user/name'.
         """
-        base_url = self.url
+        base_url: str = self.url
         if base_url.lower().endswith(".git"):
             base_url = enforce_non_empty_str_without_ws(base_url[:-4])
-        si = base_url.rfind("/")
+        si: int = base_url.rfind("/")
         if si <= 0:
             return base_url
         si = max(0, base_url.rfind("/", 0, si - 1))

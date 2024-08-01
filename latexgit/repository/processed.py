@@ -10,6 +10,7 @@ from typing import Final, Iterable
 
 from pycommons.io.console import logger
 from pycommons.io.path import Path, file_path, write_lines
+from pycommons.net.url import URL
 from pycommons.processes.shell import STREAM_CAPTURE, Command
 from pycommons.types import type_error
 
@@ -65,7 +66,7 @@ def _str_tuple(command: None | str | Iterable[str],
     return tuple(res)
 
 
-def _write(orig:str, dest: Path) -> None:
+def _write(orig: str, dest: Path) -> None:
     """
     Write the string to the destination.
 
@@ -78,7 +79,6 @@ def _write(orig:str, dest: Path) -> None:
     logger("Wrote r-stripped string of originally "
            f"{str.__len__(orig)} characters to {dest!r}, "
            f"produced file of size {getsize(dest)} bytes.")
-
 
 
 class Processed(AbstractContextManager):
@@ -128,11 +128,11 @@ class Processed(AbstractContextManager):
                     if (not pt2.is_file()) or (
                             not self.__cache_dir.contains(pt2)):
                         continue
-                    cmd: tuple[str, ...] | None = _str_tuple(
+                    cmd1: tuple[str, ...] | None = _str_tuple(
                         key[1], True, True, False)
-                    if cmd is None:
+                    if cmd1 is None:
                         continue
-                    self.__cache_mapped[(pt1, cmd)] = pt2
+                    self.__cache_mapped[(pt1, cmd1)] = pt2
 
         #: the directory to store generated
         self.__generated_dir: Final[Path] = self.base_path.resolve_inside(
@@ -153,30 +153,31 @@ class Processed(AbstractContextManager):
             s = self.__generated_list.read_all_str()
             if len(s) > 0:  # load all cached mappings
                 for key, value in json.loads(s):
-                    pt1: Path | None = Path(key[0]) \
+                    pt3: Path | None = Path(key[0]) \
                         if key[0] is not None else None
-                    if not ((pt1 is None) or self.__git.is_repo_subdir(pt1)):
-                        continue
-                    cmd: tuple[str, ...] | None = _str_tuple(
+                    if not ((pt3 is None) or self.__git.is_git_repo_path(
+                            pt3)):
+                        continue  # purge dirs not assigned to git repos
+                    cmd2: tuple[str, ...] | None = _str_tuple(
                         key[1], False, False, False)
-                    if cmd is None:
-                        continue
-                    pt2: Path = Path(value)
-                    if (not pt2.is_file()) or (
-                            not self.__generated_dir.contains(pt2)):
-                        continue
-                    self.__generated_mapped[(pt1, cmd)] = pt2
+                    if cmd2 is None:
+                        continue  # purge empty commands
+                    pt4: Path = Path(value)
+                    if (not pt4.is_file()) or (
+                            not self.__generated_dir.contains(pt4)):
+                        continue  # purge invalid cache entries
+                    self.__generated_mapped[(pt3, cmd2)] = pt4
 
     def get_file_and_url(
             self, repo_url: str, relative_path: str,
-            processor: Iterable[str] | None = ()) -> tuple[Path, str]:
+            processor: Iterable[str] | None = ()) -> tuple[Path, URL]:
         """
         Get a specified, potentially pre-processed file.
 
         :param repo_url: the repository url
         :param relative_path: the relative path of the file
         :param processor: the pre-processor commands
-        :return: the file
+        :return: the file and the url into the git repository of the original
         """
         if not self.__is_open:
             raise ValueError("already closed!")
@@ -190,7 +191,7 @@ class Processed(AbstractContextManager):
             raise type_error(relative_path, "relative_path", str)
 
         # first step: get source repository file
-        ps: Final[tuple[Path, str]] = self.__git.get_file_and_url(
+        ps: Final[tuple[Path, URL]] = self.__git.get_file_and_url(
             repo_url, relative_path)
         path: Final[Path] = ps[0]
 
@@ -227,7 +228,7 @@ class Processed(AbstractContextManager):
     def get_output(
             self, command: str | Iterable[str],
             repo_url: str | None = None,
-            relative_dir: str | None = None) -> Path:
+            relative_dir: str | None = None) -> tuple[Path, URL | None]:
         """
         Get the output of a certain command.
 
@@ -235,7 +236,8 @@ class Processed(AbstractContextManager):
         :param repo_url: the optional repository URL
         :param relative_dir: the optional directory inside the repository
             where the command should be executed
-        :return: the path to the output
+        :return: the path to the output and the url of the git repository,
+            if any
         """
         if not self.__is_open:
             raise ValueError("already closed!")
@@ -255,9 +257,12 @@ class Processed(AbstractContextManager):
                              f"None or neither, but they are {repo_url!r} "
                              f"and {relative_dir!r}.")
 
-        path: Final[Path | None] = None if (repo_url is None) \
-            else self.__git.get_repo(repo_url).path.resolve_inside(
-            relative_dir)
+        path: Path | None = None
+        url: URL | None = None
+        if repo_url is not None:
+            repo = self.__git.get_repo(repo_url)
+            path = repo.path.resolve_inside(relative_dir)
+            url = repo.url
 
         key: tuple[Path | None, tuple[str, ...]] = (path, command)
         log_str: str = f"{' '.join(repr(c) for c in command)} in {path!r}"
@@ -266,7 +271,7 @@ class Processed(AbstractContextManager):
             result: Path = self.__generated_mapped[key]
             if result.is_file():
                 logger(f"found cache entry {result!r} for {log_str}.")
-                return result  # return path to cached file
+                return result, url  # return path to cached file
 
         (handle, fpath) = mkstemp(prefix="gen_", dir=self.__generated_dir)
         os.close(handle)
@@ -278,7 +283,7 @@ class Processed(AbstractContextManager):
         _write(Command(command=command, working_dir=path,
                        stdout=STREAM_CAPTURE).execute(True)[0], dest)
         self.__generated_mapped[key] = dest
-        return dest
+        return dest, url
 
     def close(self) -> None:
         """Close the processed repository and write cache list."""

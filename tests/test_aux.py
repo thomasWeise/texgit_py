@@ -23,7 +23,7 @@ def test_aux() -> None:
             r"\relax",
             f"{REQUEST_FILE} {{{mrepo}}}{{README.md}}{{head -n 5}}",
             f"{REQUEST_FILE} {{{mrepo}}}{{LICENSE}}{{}}",
-            f"{REQUEST_FILE} {{{mrepo}}}{{Makefile}}{{sort}}",
+            f"{REQUEST_FILE} {{{mrepo}}}{{make.sh}}{{sort}}",
             f"{REQUEST_PROCESS}{{}}{{}}{{python3 --version}}",
             r"\gdef \@abspage@last{1}"]
         with tf.open_for_write() as wd:

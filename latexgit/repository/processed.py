@@ -11,6 +11,7 @@ from typing import Final, Iterable
 from pycommons.io.console import logger
 from pycommons.io.path import Path, file_path, write_lines
 from pycommons.net.url import URL
+from pycommons.processes.python import PYTHON_ENV, PYTHON_INTERPRETER
 from pycommons.processes.shell import STREAM_CAPTURE, Command
 from pycommons.types import type_error
 
@@ -279,8 +280,20 @@ class Processed(AbstractContextManager):
         log_str = f"from {log_str} to {dest!r}"
         logger(f"will pipe data from {path!r} via {log_str}")
 
+        # Now we need to fix the command if we are running inside a virtual
+        # environment. If we are running inside a virtual environment, it is
+        # necessary to use the same Python interpreter that was used to run
+        # latexgit. We should also pass along all the Python-related
+        # environment parameters.
+        use_cmd: str | tuple[str, ...] = command
+        if isinstance(use_cmd, tuple) and (tuple.__len__(use_cmd) > 1) and (
+                str.lower(use_cmd[0]).startswith("python3")):
+            lcmd: list[str] = list(use_cmd)
+            lcmd[0] = PYTHON_INTERPRETER
+            use_cmd = tuple(lcmd)
+
         # execute the command
-        _write(Command(command=command, working_dir=path,
+        _write(Command(command=use_cmd, working_dir=path, env=PYTHON_ENV,
                        stdout=STREAM_CAPTURE).execute(True)[0], dest)
         self.__generated_mapped[key] = dest
         return dest, url

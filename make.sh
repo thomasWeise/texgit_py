@@ -27,7 +27,7 @@ rm -rf build
 rm -rf dist
 rm -rf docs/build
 rm -rf docs/source/*.rst
-rm -rf moptipy.egg-info
+rm -rf latexgit.egg-info
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Done cleaning up old files."
 
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): We setup a virtual environment in a temp directory."
@@ -77,7 +77,7 @@ echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now building source distribution file."
 "$PYTHON_INTERPRETER" -m pycommons.dev.building.make_dist --root "$currentDir" --package latexgit
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Successfully finished building source distribution."
 
-echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now trying to install moptipy."
+echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now trying to install latexgit."
 "$PYTHON_INTERPRETER" -m pip install --no-input --timeout 360 --retries 100 -v "$currentDir"
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Successfully installed latexgit."
 

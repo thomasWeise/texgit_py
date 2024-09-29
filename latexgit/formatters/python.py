@@ -98,7 +98,7 @@ def __format_lines(code: str) -> str:
     'class b:\n    def bb(self):\n        x = 3 / a()'
     """
     return str.replace(str.rstrip(yapf.yapf_api.FormatCode(
-        code, style_config=__YAPF_STYLE)[0]), "\n\n\n", "\n\n")
+        code, style_config=__YAPF_STYLE)[0]), "\n\n\n\n", "\n\n\n")
 
 
 #: the regexes stripping comments that occupy a complete line
@@ -115,7 +115,7 @@ def __strip_hints(
     :return: the stripped code string
     >>> __format_lines(__strip_hints(
     ...     "a: int = 7\ndef b(c: int) -> List[int]:\n    return [4]"))
-    'a = 7\n\ndef b(c):\n    return [4]'
+    'a = 7\n\n\ndef b(c):\n    return [4]'
     """
     new_text: str = sh.strip_string_to_string(
         code, strip_nl=True, to_empty=True)

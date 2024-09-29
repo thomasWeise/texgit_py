@@ -77,7 +77,7 @@ def __force_no_empty_after(line: str) -> bool:
 #: the internal style for formatting Python code
 __YAPF_STYLE = yapf.style.CreatePEP8Style()
 __YAPF_STYLE["ARITHMETIC_PRECEDENCE_INDICATION"] = True
-__YAPF_STYLE["BLANK_LINES_AROUND_TOP_LEVEL_DEFINITION"] = 1
+__YAPF_STYLE["BLANK_LINES_AROUND_TOP_LEVEL_DEFINITION"] = 2
 __YAPF_STYLE["BLANK_LINE_BEFORE_NESTED_CLASS_OR_DEF"] = False
 __YAPF_STYLE["COALESCE_BRACKETS"] = True
 __YAPF_STYLE["COLUMN_LIMIT"] = 74
@@ -97,8 +97,8 @@ def __format_lines(code: str) -> str:
     >>> __format_lines("\n\n   \nclass b:\n   def bb(self):      x  =3/a()")
     'class b:\n    def bb(self):\n        x = 3 / a()'
     """
-    return yapf.yapf_api.FormatCode(
-        code, style_config=__YAPF_STYLE)[0].rstrip()
+    return str.replace(str.rstrip(yapf.yapf_api.FormatCode(
+        code, style_config=__YAPF_STYLE)[0]), "\n\n\n", "\n\n")
 
 
 #: the regexes stripping comments that occupy a complete line

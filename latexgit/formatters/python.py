@@ -253,7 +253,7 @@ def format_python(code: Iterable[str],
             empty_before=__empty_before,
             no_empty_after=__no_empty_after,
             force_no_empty_after=__force_no_empty_after,
-            max_consecutive_empty_lines=1))
+            max_consecutive_empty_lines=2))
         if len(rcode) <= 0:
             raise ValueError("Code becomes empty.")
 

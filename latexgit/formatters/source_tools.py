@@ -299,7 +299,7 @@ def format_empty_lines(lines: Iterable[str],
                        empty_before: Callable = lambda line: False,
                        no_empty_after: Callable = lambda line: False,
                        force_no_empty_after: Callable = lambda line: False,
-                       max_consecutive_empty_lines: int = 1) -> list[str]:
+                       max_consecutive_empty_lines: int = 2) -> list[str]:
     """
     Obtain a generator that strips any consecutive empty lines.
 

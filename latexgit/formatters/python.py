@@ -125,8 +125,8 @@ def __strip_hints(
 
     if strip_comments:
         # In the ideal case, we want to strip all comments anyway.
-        # Then we do not need to bother with anything complex and can
-        # directly use a regular expression getting rid of them.
+        # Then we do not need to.read_all_str() bother with anything complex
+        # and can directly use a regular expression getting rid of them.
         new_text2 = None
         while new_text2 != new_text:
             new_text2 = new_text
@@ -317,7 +317,8 @@ def preprocess_python(code: list[str],
     :param params: the arguments for the code formatter
     :return: the formatted code string
     """
-    keep_lines = select_lines(code=code, labels=labels, lines=lines)
+    keep_lines = select_lines(code=code, labels=labels, lines=lines,
+                              max_consecutive_empty_lines=2)
 
     # set up arguments
     strip_docstrings: bool = True

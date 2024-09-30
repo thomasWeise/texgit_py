@@ -92,7 +92,7 @@ def select_lines(code: Iterable[str],
                  lines: Iterable[int] | None = None,
                  labels: Iterable[str] | None = None,
                  line_comment_start: str = "#",
-                 max_consecutive_empty_lines: int = 1) -> list[str]:
+                 max_consecutive_empty_lines: int = 2) -> list[str]:
     r"""
     Select lines of source code based on labels and line indices.
 

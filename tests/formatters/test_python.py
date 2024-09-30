@@ -7,6 +7,7 @@ from pycommons.processes.python import PYTHON_ENV, python_command
 from pycommons.processes.shell import STREAM_CAPTURE, Command
 
 import latexgit.formatters.python as fp
+from latexgit.formatters.python import preprocess_python
 
 
 def test_python_1() -> None:
@@ -27,12 +28,23 @@ def test_python_1() -> None:
 def test_python_2() -> None:
     """Test the python formatter."""
     sf: Final[Path] = file_path(__file__)
-    source: Final[str] = str.rstrip(sf.read_all_str()[12:38])
+    source: Final[str] = str.rstrip("\n".join(
+        sf.read_all_str().splitlines()[12:38]))
     wd: Path = sf.up(3)
     call: list[str] = list(python_command(fp.__file__))
     call.extend(["--args", "format"])
     formatted = Command(
         call, stdin=source, stdout=STREAM_CAPTURE,
         working_dir=wd, env=PYTHON_ENV).execute()[0]
+    assert isinstance(formatted, str)
+    assert str.rstrip(formatted) == source
+
+
+def test_python_3() -> None:
+    """Test the python formatter."""
+    sf: Final[Path] = file_path(__file__)
+    source: Final[str] = str.rstrip("\n".join(
+        sf.read_all_str().splitlines()[12:38]))
+    formatted = preprocess_python(source.splitlines(), None, None, {"format"})
     assert isinstance(formatted, str)
     assert str.rstrip(formatted) == source

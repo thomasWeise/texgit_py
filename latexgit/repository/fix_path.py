@@ -1,11 +1,11 @@
 """A tool for fixing all occurrences of a Path."""
 
+from contextlib import suppress
 from itertools import chain
 from os import sep
 from re import MULTILINE, Match, escape, sub
 from typing import Final
 
-from exceptiongroup import suppress
 from pycommons.io.path import Path
 
 #: the replacement string for base paths

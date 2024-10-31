@@ -15,6 +15,7 @@ from pycommons.processes.python import PYTHON_ENV, PYTHON_INTERPRETER
 from pycommons.processes.shell import STREAM_CAPTURE, Command
 from pycommons.types import type_error
 
+from latexgit.repository.fix_path import replace_base_path
 from latexgit.repository.gitmanager import GitManager
 
 
@@ -258,11 +259,13 @@ class Processed(AbstractContextManager):
                              f"None or neither, but they are {repo_url!r} "
                              f"and {relative_dir!r}.")
 
+        repo_path: Path | None = None
         path: Path | None = None
         url: URL | None = None
         if repo_url is not None:
             repo = self.__git.get_repo(repo_url)
-            path = repo.path.resolve_inside(relative_dir)
+            repo_path = repo.path
+            path = repo_path.resolve_inside(relative_dir)
             url = repo.url
 
         key: tuple[Path | None, tuple[str, ...]] = (path, command)
@@ -293,8 +296,12 @@ class Processed(AbstractContextManager):
             use_cmd = tuple(lcmd)
 
         # execute the command
-        _write(Command(command=use_cmd, working_dir=path, env=PYTHON_ENV,
-                       stdout=STREAM_CAPTURE).execute(True)[0], dest)
+        output: str = Command(
+            command=use_cmd, working_dir=path, env=PYTHON_ENV,
+            stdout=STREAM_CAPTURE).execute(True)[0]
+        if repo_path is not None:  # fix the base path
+            output = replace_base_path(output, repo_path)
+        _write(output, dest)
         self.__generated_mapped[key] = dest
         return dest, url
 

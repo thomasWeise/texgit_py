@@ -20,7 +20,7 @@ def test_aux() -> None:
           temp_file(td, suffix=".aux") as tf):
         txt = [
             r"\relax",
-            f"{REQUEST_FILE} {{{mrepo}}}{{05_functions/def_factorial.py}}{{"
+            f"{REQUEST_FILE} {{{mrepo}}}{{functions/def_factorial.py}}{{"
             f"python3 -m latexgit.formatters.python --args format}}",
             r"\gdef \@abspage@last{1}"]
         with tf.open_for_write() as wd:

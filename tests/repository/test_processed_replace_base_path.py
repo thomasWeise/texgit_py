@@ -11,10 +11,10 @@ def test_processed_git_replace_path() -> None:
         proc: Processed = Processed(td)
         repo: str = "https://github.com/thomasWeise/programmingWithPythonCode"
         p, u = proc.get_output(
-            ("./scripts/pythonIgnoreErrors.sh",
-             "06_exceptions", "use_sqrt_raise.py"),
+            ("./_scripts_/pythonIgnoreErrors.sh",
+             "exceptions", "use_sqrt_raise.py"),
             repo, ".")
         text = p.read_all_str()
         assert str.__len__(text) > 0
-        assert 'File "{...}/06_exceptions/sqrt_raise.py"' in text
+        assert 'File "{...}/exceptions/sqrt_raise.py"' in text
         assert u.startswith(repo)

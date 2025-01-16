@@ -3,11 +3,13 @@
 import json
 import os
 from contextlib import AbstractContextManager
+from os import environ
 from os.path import getsize
 from shutil import rmtree
 from tempfile import mkstemp
-from typing import Final, Iterable
+from typing import Final, Iterable, Mapping
 
+from pycommons.ds.immutable_map import immutable_mapping
 from pycommons.io.console import logger
 from pycommons.io.path import Path, file_path, write_lines
 from pycommons.net.url import URL
@@ -81,6 +83,22 @@ def _write(orig: str, dest: Path) -> None:
     logger("Wrote r-stripped string of originally "
            f"{str.__len__(orig)} characters to {dest!r}, "
            f"produced file of size {getsize(dest)} bytes.")
+
+
+def __get_sys_env() -> Mapping[str, str]:
+    """
+    Get the system environment variables in the current environment.
+
+    :return: A mapping of variable names to values.
+    """
+    base: dict[str, str] = dict(environ)
+    base.update(PYTHON_ENV)
+    return immutable_mapping(base)
+
+
+#: the environment that we will pass on
+SYS_ENV: Final[Mapping[str, str]] = __get_sys_env()
+del __get_sys_env
 
 
 class Processed(AbstractContextManager):
@@ -289,15 +307,17 @@ class Processed(AbstractContextManager):
         # latexgit. We should also pass along all the Python-related
         # environment parameters.
         use_cmd: str | tuple[str, ...] = command
+        env: Mapping[str, str] = SYS_ENV
         if isinstance(use_cmd, tuple) and (tuple.__len__(use_cmd) > 1) and (
                 str.lower(use_cmd[0]).startswith("python3")):
             lcmd: list[str] = list(use_cmd)
             lcmd[0] = PYTHON_INTERPRETER
+            env = PYTHON_ENV
             use_cmd = tuple(lcmd)
 
         # execute the command
         output: str = Command(
-            command=use_cmd, working_dir=path, env=PYTHON_ENV,
+            command=use_cmd, working_dir=path, env=env,
             stdout=STREAM_CAPTURE).execute(True)[0]
         if repo_path is not None:  # fix the base path
             output = replace_base_path(output, repo_path)

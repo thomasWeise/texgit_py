@@ -132,11 +132,11 @@ def __get_request(line: str) -> tuple[
     marker: int = 33
     while list.__len__(markers) <= 4:
         cmarker: str = chr(marker)
+        marker += 1
         if cmarker in strset:
             continue
         markers.append(cmarker)
         strset.add(cmarker)
-        marker += 1
     del strset
     del cmarker
     del marker

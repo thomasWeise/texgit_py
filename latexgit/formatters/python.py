@@ -1,10 +1,11 @@
 """A formatter for python code."""
 import argparse
 import io
-import re as reg  # type: ignore
 import sys
 import token
 import tokenize
+from re import MULTILINE, Pattern, sub
+from re import compile as re_compile
 from typing import Final, Iterable
 
 import strip_hints as sh  # type: ignore
@@ -102,8 +103,8 @@ def __format_lines(code: str) -> str:
 
 
 #: the regexes stripping comments that occupy a complete line
-__REGEX_STRIP_LINE_COMMENT: reg.Pattern = reg.compile(
-    "\\n[ \\t]*?#.*?\\n", flags=reg.MULTILINE)
+__REGEX_STRIP_LINE_COMMENT: Pattern = re_compile(
+    r"\n[ \t]*?#.*?\n", flags=MULTILINE)
 
 
 def __strip_hints(
@@ -130,7 +131,7 @@ def __strip_hints(
         new_text2 = None
         while new_text2 != new_text:
             new_text2 = new_text
-            new_text = reg.sub(__REGEX_STRIP_LINE_COMMENT, "\n", new_text)
+            new_text = sub(__REGEX_STRIP_LINE_COMMENT, "\n", new_text)
         return new_text
 
     # If we should preserve normal comments, all we can do is trying to
@@ -172,7 +173,7 @@ def __strip_docstrings_and_comments(code: str,
         code2 = None
         while code2 != code:
             code2 = code
-            code = reg.sub(__REGEX_STRIP_LINE_COMMENT, "\n", code)
+            code = sub(__REGEX_STRIP_LINE_COMMENT, "\n", code)
         del code2
 
     # Now we strip the doc strings and remaining comments.
@@ -192,7 +193,7 @@ def __strip_docstrings_and_comments(code: str,
                 if scol > last_col:
                     output.write(" " * (scol - last_col))
                 if (toktype == token.STRING) and \
-                        (prev_toktype in (token.INDENT, token.NEWLINE)):
+                        (prev_toktype in {token.INDENT, token.NEWLINE}):
                     if strip_docstrings:
                         ttext = ""
                         eat_newline = 1
@@ -337,10 +338,10 @@ def preprocess_python(code: list[str],
                                    strip_comments=strip_comments,
                                    strip_hints=strip_hintx)
 
-    while (len(keep_lines) > 0) and (keep_lines[-1] == ""):
+    while (len(keep_lines) > 0) and (not keep_lines[-1]):
         del keep_lines[-1]
 
-    if (len(keep_lines) == 0) or (keep_lines[-1] != ""):
+    if (len(keep_lines) == 0) or keep_lines[-1]:
         keep_lines.append("")
     return "\n".join(map(str.rstrip, keep_lines))
 

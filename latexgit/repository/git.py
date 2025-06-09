@@ -1,7 +1,8 @@
 """Tools for interacting with repository."""
 import datetime
-import re
 from dataclasses import dataclass
+from re import MULTILINE, Pattern, search
+from re import compile as re_compile
 from shutil import rmtree, which
 from typing import Final, cast
 
@@ -26,7 +27,7 @@ def git() -> Path:
     obj: Final[object] = git
     attr: Final[str] = "__the_path"
     if hasattr(obj, attr):
-        return cast(Path, getattr(obj, attr))
+        return cast("Path", getattr(obj, attr))
 
     path: str | None = which("git")
     if path is None:
@@ -34,6 +35,12 @@ def git() -> Path:
     result: Final[Path] = file_path(path)
     setattr(obj, attr, result)
     return result
+
+
+#: the commit pattern
+_COMMIT: Final[Pattern] = re_compile(r"^\s*commit\s+(.+?)\s+", flags=MULTILINE)
+#: the date
+_DATE: Final[Pattern] = re_compile(r"^\s*Date:\s+(.+?)$", flags=MULTILINE)
 
 
 @dataclass(frozen=True, init=False, order=True)
@@ -133,13 +140,12 @@ class GitRepository:
             timeout=120, working_dir=dest, stdout=STREAM_CAPTURE).execute(
             True)[0])
 
-        match = re.search("^\\s*commit\\s+(.+?)\\s+", stdout,
-                          flags=re.MULTILINE)
+        match = search(_COMMIT, stdout)
         if match is None:
             raise ValueError(
                 f"Did not find commit information in repo {dest!r}.")
         commit: Final[str] = enforce_non_empty_str_without_ws(match.group(1))
-        match = re.search("^\\s*Date:\\s+(.+?)$", stdout, flags=re.MULTILINE)
+        match = search(_DATE, stdout)
         if match is None:
             raise ValueError(
                 f"Did not find date information in repo {dest!r}.")

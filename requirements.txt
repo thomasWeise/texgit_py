@@ -20,10 +20,10 @@
 #
 
 # pycommons provides lots of utilities
-pycommons == 0.8.61
+pycommons == 0.8.66
 
 # strip-hints is a tool for removing type hints
-strip-hints == 0.1.10
+strip-hints == 0.1.13
 
 # yapf is a python code formatter
-yapf == 0.40.2
+yapf == 0.43.0

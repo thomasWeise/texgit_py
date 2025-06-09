@@ -6,7 +6,7 @@ from typing import Final
 from pycommons.io.arguments import make_argparser, make_epilog
 from pycommons.io.console import logger
 from pycommons.io.path import Path, directory_path, write_lines
-from pycommons.net.url import URL
+from pycommons.net.url import URL  # noqa: TC002
 from pycommons.types import type_error
 
 from latexgit.repository.processed import Processed

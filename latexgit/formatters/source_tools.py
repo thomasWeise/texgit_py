@@ -1,14 +1,15 @@
 """In this file, we put some shared tools for rendering source codes."""
 
-import re
 import sys
-from typing import Callable, Iterable
+from re import MULTILINE, Pattern
+from re import compile as re_compile
+from typing import Callable, Final, Iterable
 
 from pycommons.strings.enforce import enforce_non_empty_str
 from pycommons.types import type_error
 
 # the split pattern
-__SPLT: re.Pattern = re.compile("[;,+\n\t ]", re.MULTILINE)
+__SPLT: Final[Pattern] = re_compile(r"[;,+\n\t ]", MULTILINE)
 
 
 def split_line_choices(lines: str | None) -> list[int] | None:
@@ -296,9 +297,9 @@ def select_lines(code: Iterable[str],
 
 
 def format_empty_lines(lines: Iterable[str],
-                       empty_before: Callable = lambda line: False,
-                       no_empty_after: Callable = lambda line: False,
-                       force_no_empty_after: Callable = lambda line: False,
+                       empty_before: Callable = lambda _: False,
+                       no_empty_after: Callable = lambda _: False,
+                       force_no_empty_after: Callable = lambda _: False,
                        max_consecutive_empty_lines: int = 2) -> list[str]:
     """
     Obtain a generator that strips any consecutive empty lines.

@@ -21,7 +21,7 @@ from latexgit.repository.fix_path import replace_base_path
 from latexgit.repository.gitmanager import GitManager
 
 
-def _str_tuple(command: None | str | Iterable[str],
+def _str_tuple(command: str | Iterable[str] | None,
                none_ok: bool = True,
                empty_ok: bool = True,
                raise_errors: bool = False) -> tuple[str, ...] | None:
@@ -152,7 +152,7 @@ class Processed(AbstractContextManager):
                         key[1], True, True, False)
                     if cmd1 is None:
                         continue
-                    self.__cache_mapped[(pt1, cmd1)] = pt2
+                    self.__cache_mapped[pt1, cmd1] = pt2
 
         #: the directory to store generated
         self.__generated_dir: Final[Path] = self.base_path.resolve_inside(
@@ -186,7 +186,7 @@ class Processed(AbstractContextManager):
                     if (not pt4.is_file()) or (
                             not self.__generated_dir.contains(pt4)):
                         continue  # purge invalid cache entries
-                    self.__generated_mapped[(pt3, cmd2)] = pt4
+                    self.__generated_mapped[pt3, cmd2] = pt4
 
     def get_file_and_url(
             self, repo_url: str, relative_path: str,

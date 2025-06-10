@@ -6,7 +6,6 @@ can consistently be accessed without loading any repository multiple
 times.
 """
 
-from dataclasses import dataclass
 from os import rmdir
 from typing import Final
 
@@ -16,35 +15,6 @@ from pycommons.types import type_error
 
 from latexgit.repository.file_manager import FileManager
 from latexgit.repository.git import GitRepository
-
-
-@dataclass(frozen=True, init=False, order=True)
-class GitFile:
-    """An immutable record of a repository."""
-
-    #: the repository path
-    path: Path
-    #: the repository url
-    url: URL
-    #: the commit
-    repo: GitRepository
-
-    def __init__(self, path: Path, url: str, repo: GitRepository):
-        """
-        Set up the information about a repository.
-
-        :param path: the path
-        :param url: the url
-        :param repo: the git repository
-        """
-        if not isinstance(path, Path):
-            raise type_error(path, "path", Path)
-        path.enforce_file()
-        object.__setattr__(self, "path", path)
-        object.__setattr__(self, "url", URL(url))
-        if not isinstance(repo, GitRepository):
-            raise type_error(repo, "repository", GitRepository)
-        object.__setattr__(self, "repo", repo)
 
 
 def _make_key(u: URL) -> tuple[str, str]:
@@ -117,7 +87,8 @@ class GitManager(FileManager):
         self.__repos[_make_key(gt.url)] = gt
         return gt
 
-    def get_git_file(self, repo_url: str, relative_path: str) -> GitFile:
+    def get_git_file(self, repo_url: str, relative_path: str)\
+            -> tuple[Path, URL]:
         """
         Get a path to a file from the given git repository and also the URL.
 
@@ -131,4 +102,4 @@ class GitManager(FileManager):
         file: Final[Path] = repo.path.resolve_inside(
             relative_path)
         file.enforce_file()
-        return GitFile(file, repo.make_url(relative_path), repo)
+        return file, repo.make_url(relative_path)

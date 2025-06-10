@@ -1,18 +1,22 @@
 """
 A class for managing files and directories.
 
-A file manager provides a two-level abstraction for assigning names to paths.
-It exists within a certain base directory.
+A :class:`~latexgit.repository.file_manager.FileManager` provides a two-level
+abstraction for assigning paths to unique IDs.
+An ID is a combination of a "realm" and a "name", both of which are non-empty
+strings without whitespace.
+
+A file manager resides within a certain base directory.
 Inside the base directory, it provides so-called "realms".
 Each realm is a separate namespace.
 With a realm, "names" are mapped to paths.
 The file manager ensures that the same realm-name combination is always
 assigned to the same path.
-The first time it is queried, the path is created.
+The first time such a combination is queried, the path is created.
 This path can be a file or a directory, depending on what was queried.
 Every realm-name combination always uniquely identifies a path and there can
 never be another realm-name combination pointing to the same path.
-The paths are randomized to avoid potential clashes.
+If need be, the paths are randomized to avoid potential clashes.
 
 Once the file manager is closed, the realm-name to path associations are
 stored.
@@ -20,6 +24,21 @@ When a new file manager instance is created for the same base directory, the
 associations of realms-names to paths are restored.
 This means that a program that creates output files for certain commands can
 then find these files again later.
+
+:class:`~latexgit.repository.git_manager.GitManager` is the base and root of
+the functionality of a managed repository of files and data.
+Step-by-step, functionality is added to the manager by derived classes.
+We do this iteratively:
+
+:class:`~latexgit.repository.git_manager.GitManager` adds the capability to
+automatically download and use `git` repositories. For this purpose, it uses
+the realm `git`.
+
+:class:`~latexgit.repository.process_manager.ProcessManager` adds the ability
+to execute programs or scripts and to store their output in files to the
+:class:`~latexgit.repository.git_manager.GitManager`.
+These programs and scripts may be located in `git` repositories that have
+automatically been downloaded.
 """
 import json
 from contextlib import AbstractContextManager, suppress
@@ -228,47 +247,6 @@ class FileManager(AbstractContextManager):
             `False` if not.
         """
         return self.__get(realm, name, True, prefix, suffix)
-
-    def get_argument_file(self, name: str, prefix: str | None = None,
-                          suffix: str | None = None) -> tuple[Path, bool]:
-        """
-        Create a file in the arguments realm.
-
-        :param name: the ID for the file
-        :param prefix: the optional prefix
-        :param suffix: the optional suffix
-        :return: the file, plus a `bool` indicating whether it was just
-            created (`True`) or already existed (`False`)
-        """
-        return self.get_file(
-            "args", name, (str.strip(prefix) or None) if prefix else None,
-            (str.strip(suffix) or None) if suffix else None)
-
-    def filter_argument(self, arg: str) -> str | None:
-        """
-        Filter an argument to be passed to any given file.
-
-        This function can be used to rewire arguments of certain programs that
-        we want to invoke to specific files.
-
-        :param arg: the argument
-        :return: the filtered argument
-        """
-        arg = str.strip(arg)
-        if arg:
-            if arg.startswith("(:") and arg.endswith(":)"):
-                args: Final[list[str]] = arg[2:-2].split(":")
-                argc: Final[int] = list.__len__(args)
-                if not (0 < argc < 4):
-                    raise ValueError(f"Invalid argument {arg!r}.")
-                name: Final[str] = str.strip(args[0])
-                if str.__len__(name) <= 0:
-                    raise ValueError(f"Invalid ID in {arg!r}.")
-                return self.get_argument_file(
-                    name, args[1] if argc > 1 else None,
-                    args[2] if argc > 2 else None)[0]
-            return arg
-        return None
 
     def close(self) -> None:
         """Close the file manager and write cache list."""

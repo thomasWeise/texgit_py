@@ -1,1 +1,1 @@
-"""Interaction with repository."""
+"""Interaction with repositories and processes."""

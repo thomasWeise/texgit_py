@@ -96,7 +96,7 @@ class FileManager(AbstractContextManager):
             self.__cache_file.enforce_file()
             for key, values in json.loads(
                     self.__cache_file.read_all_str()).items():
-                realm = _make_key(key[0])
+                realm = _make_key(key)
                 realm_dir = self.__realms_dir.resolve_inside(realm)
                 realm_map = {}
                 for name, path in values.items():

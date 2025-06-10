@@ -17,11 +17,11 @@ def test_file_manager() -> None:
             p2, t = fm.get_file("A", "test")
             assert p2 is p1
             assert not t
-            p3, t = fm.get_file("B", "test")
+            p3, t = fm.get_file("sdfsdf", "test")
             assert isinstance(p3, Path)
             assert p3.is_file()
             assert t
-            p4, t = fm.get_file("B", "test")
+            p4, t = fm.get_file("sdfsdf", "test")
             assert p3 is p4
             assert not t
             assert p3 != p1
@@ -39,28 +39,29 @@ def test_file_manager() -> None:
             assert p6 != p1
             assert p6 != p5
             assert set(fm.list_realm("A")) == {p1, p5, p6}
-            assert set(fm.list_realm("B")) == {p3}
+            assert set(fm.list_realm("sdfsdf")) == {p3}
             assert tuple.__len__(fm.list_realm("A", False, True)) == 0
-            assert tuple.__len__(fm.list_realm("B", False, True)) == 0
+            assert tuple.__len__(fm.list_realm("sdfsdf", False, True)) == 0
             assert tuple.__len__(fm.list_realm("C")) == 0
-            p7, t = fm.get_dir("B", "hello")
+            p7, t = fm.get_dir("sdfsdf", "hello")
             assert t
             assert p7.is_dir()
-            p8, t = fm.get_file("B", name="v", suffix=".s")
+            p8, t = fm.get_file("sdfsdf", name="v", suffix=".s")
             assert p8.is_file()
             assert t
-            p9, t = fm.get_file("B", name=p8.basename())
+            p9, t = fm.get_file("sdfsdf", name=p8.basename())
             assert p9.is_file()
             assert t
             assert p8 != p9
-            px, t = fm.get_dir("B", p9.basename())
+            px, t = fm.get_dir("sdfsdf", p9.basename())
             assert px.is_dir()
             assert t
-            pxy, t = fm.get_dir("B", p9.basename())
+            pxy, t = fm.get_dir("sdfsdf", p9.basename())
             assert px is pxy
             assert t is False
-            assert set(fm.list_realm("B", directories=False)) == {p3, p8, p9}
-            assert set(fm.list_realm("B", files=False)) == {p7, px}
+            assert set(fm.list_realm("sdfsdf", directories=False)) == {
+                p3, p8, p9}
+            assert set(fm.list_realm("sdfsdf", files=False)) == {p7, px}
 
         with FileManager(td) as fm:
             p1b, t = fm.get_file("A", "test")
@@ -69,10 +70,10 @@ def test_file_manager() -> None:
             p2b, t = fm.get_file("A", "test")
             assert not t
             assert p2b is p1b
-            p3b, t = fm.get_file("B", "test")
+            p3b, t = fm.get_file("sdfsdf", "test")
             assert not t
             assert p3b == p3
-            p4b, t = fm.get_file("B", "test")
+            p4b, t = fm.get_file("sdfsdf", "test")
             assert not t
             assert p3b is p4b
             p5b, t = fm.get_file("A", "other", prefix="pfx")
@@ -82,8 +83,9 @@ def test_file_manager() -> None:
             assert not t
             assert p6b == p6
             assert set(fm.list_realm("A")) == {p1, p5, p6}
-            assert set(fm.list_realm("B", directories=False)) == {p3, p8, p9}
-            assert set(fm.list_realm("B", files=False)) == {p7, px}
+            assert set(fm.list_realm("sdfsdf", directories=False)) == {
+                p3, p8, p9}
+            assert set(fm.list_realm("sdfsdf", files=False)) == {p7, px}
             py, t = fm.get_file("A", ".gitignore")
             assert isinstance(py, Path)
             assert py.is_file()

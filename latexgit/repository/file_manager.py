@@ -256,7 +256,7 @@ class FileManager(AbstractContextManager):
         """
         arg = str.strip(arg)
         if arg:
-            if arg.startswith("(@") and arg.endswith("@)"):
+            if arg.startswith("(:") and arg.endswith(":)"):
                 args: Final[list[str]] = arg[2:-2].split(":")
                 argc: Final[int] = list.__len__(args)
                 if not (0 < argc < 4):

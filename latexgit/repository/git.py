@@ -45,7 +45,7 @@ _DATE: Final[Pattern] = re_compile(r"^\s*Date:\s+(.+?)$", flags=MULTILINE)
 
 @dataclass(frozen=True, init=False, order=True)
 class GitRepository:
-    """An immutable record of a repository repository."""
+    """An immutable record of a repository."""
 
     #: the repository path
     path: Path

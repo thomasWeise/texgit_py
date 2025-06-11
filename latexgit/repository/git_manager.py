@@ -22,27 +22,30 @@ from latexgit.repository.git import GitRepository
 class GitPath:
     """An immutable record of a path inside a git repository."""
 
-    #: the repository path
+    #: the absolute path of the file or directory inside the repository
+    #: directory
     path: Path
     #: the repository
     repo: GitRepository
+    #: the URL
+    url: URL
 
-    def __init__(self, path: Path, repo: GitRepository):
+    def __init__(self, path: Path, repo: GitRepository, url: URL):
         """
         Set up the information about a repository.
 
-        :param path: the path
-        :param url: the url
-        :param commit: the commit
-        :param date_time: the date and time
+        :param path: the absolute path to the file or directory
+        :param repo: the repository
         """
         if not isinstance(path, Path):
-            raise type_error(path, "path", Path)
+            raise type_error(path, "path_in_repo", Path)
         if not isinstance(repo, GitRepository):
             raise type_error(repo, "repo", GitRepository)
-        repo.path.enforce_contains(path)
+        if not isinstance(url, URL):
+            raise type_error(url, "url", URL)
         object.__setattr__(self, "path", path)
         object.__setattr__(self, "repo", repo)
+        object.__setattr__(self, "url", url)
 
 
 def _make_key(u: URL) -> tuple[str, str]:
@@ -82,16 +85,15 @@ class GitManager(FileManager):
                 gr: GitRepository = GitRepository.from_local(the_dir)
                 self.__repos[_make_key(gr.url)] = gr
 
-    def is_git_repository_path(self, path: Path | None) -> bool:
+    def _get_sensitive_paths(self) -> list[Path]:
         """
-        Check if the given path identifies a directory inside a repository.
+        Get the list of sensitive paths.
 
-        :param path: the path
-        :return: `True` if `path` identifies a directory located in a
-            repository.
+        :return: the paths
         """
-        return (path is not None) and path.is_dir() and any(
-            repo.path.contains(path) for repo in self.__repos.values())
+        paths: Final[list[Path]] = super()._get_sensitive_paths()
+        paths.extend(r.path for r in self.__repos.values())
+        return paths
 
     def get_repository(self, url: str) -> GitRepository:
         """
@@ -100,6 +102,7 @@ class GitManager(FileManager):
         :param url: the URL to load
         :return: the repository
         """
+        self._check_open()
         use_url: Final[URL] = URL(url)
         key: Final[tuple[str, str]] = _make_key(use_url)
         if key in self.__repos:
@@ -127,32 +130,31 @@ class GitManager(FileManager):
         :param is_file: should it be a file (`True`) or directory (`False`)
         :return: the path and the URL
         """
-        if not isinstance(relative_path, str):
-            raise type_error(relative_path, "relative_path", str)
+        relative_path = str.strip(relative_path)
         repo: Final[GitRepository] = self.get_repository(repo_url)
         dest: Final[Path] = repo.path.resolve_inside(relative_path)
         if is_file:
             dest.enforce_file()
         else:
             dest.enforce_dir()
-        return GitPath(dest, repo)
+        return GitPath(dest, repo, repo.make_url(dest))
 
-    def get_git_file(self, repo_url: str, relative_dir: str) -> GitPath:
+    def get_git_file(self, repo_url: str, relative_file: str) -> GitPath:
         """
         Get a path to a file from the given git repository and also the URL.
 
         :param repo_url: the repository url.
-        :param relative_dir: the relative path
+        :param relative_file: the relative path
         :return: a tuple of file and URL
         """
-        return self.__get_git(repo_url, relative_dir, True)
+        return self.__get_git(repo_url, relative_file, True)
 
-    def get_git_dir(self, repo_url: str, relative_file: str) -> GitPath:
+    def get_git_dir(self, repo_url: str, relative_dir: str) -> GitPath:
         """
         Get a path to a directory from the given git repository.
 
         :param repo_url: the repository url.
-        :param relative_file: the relative path
+        :param relative_dir: the relative path
         :return: a tuple of directory and URL
         """
-        return self.__get_git(repo_url, relative_file, False)
+        return self.__get_git(repo_url, relative_dir, False)

@@ -127,6 +127,22 @@ class FileManager(AbstractContextManager):
                 if dict.__len__(realm_map) > 0:
                     self.__map[realm] = (realm_dir, realm_map)
 
+    def _check_open(self) -> None:
+        """Enforce that the file manager is open."""
+        if not self.__is_open:
+            raise ValueError("Already closed!")
+
+    def _get_sensitive_paths(self) -> list[Path]:
+        """
+        Get the list of sensitive paths.
+
+        :return: the list of sensitive paths
+        """
+        paths: Final[list[Path]] = [
+            self.__base_dir, self.__realms_dir, self.__cache_file]
+        paths.extend(map(self.__realms_dir.resolve_inside, self.__map.keys()))
+        return paths
+
     def __get(self, realm: str, name: str,
               is_file: bool,
               prefix: str | None = None,
@@ -142,8 +158,7 @@ class FileManager(AbstractContextManager):
         :return: the generated path and `True` if it was new,
             or `False` if not.
         """
-        if not self.__is_open:
-            raise ValueError("Already closed!")
+        self._check_open()
         realm = _make_key(realm)
         name = _make_key(name)
         if prefix is not None:

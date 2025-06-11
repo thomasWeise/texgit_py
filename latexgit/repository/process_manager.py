@@ -111,9 +111,61 @@ class ProcessManager(GitManager):
             return arg
         return None
 
+    def __execute(self, dest: Path,
+                  command: str | Iterable[str],
+                  working_dir: Path | None = None,
+                  stdin: str | None = None) -> None:
+        """
+        Make a command and environment.
+
+        :param dest: the destination path
+        :param command: the command
+        :param working_dir: an optional working directory
+        :param stdin: the standard input for the program, or `None`
+        """
+        # process the command
+        cmd_lst: Final[list[str]] = [command] if isinstance(command, str)\
+            else list(command)
+        for i in range(list.__len__(cmd_lst) - 1, -1, -1):
+            cmd: str = str.strip(cmd_lst[i])
+            if str.__len__(cmd) <= 0:
+                del cmd_lst[i]
+                continue
+
+        # process the arguments
+        for i in range(list.__len__(cmd_lst) - 1, 0, -1):
+            cmd = self.filter_argument(cmd_lst[i])
+            if cmd is None:
+                del cmd_lst[i]
+                continue
+
+        if list.__len__(cmd_lst) <= 0:
+            raise ValueError(f"Invalid command {command!r}.")
+
+        # Now we need to fix the command if we are running inside a virtual
+        # environment. If we are running inside a virtual environment, it is
+        # necessary to use the same Python interpreter that was used to run
+        # latexgit. We should also pass along all the Python-related
+        # environment parameters.
+        env: Mapping[str, str] = SYS_ENV
+        if str.lower(cmd_lst[0]).startswith("python3"):
+            cmd_lst[0] = PYTHON_INTERPRETER
+            env = PYTHON_ENV
+
+        # execute the command and capture the output
+        output: str = Command(
+            command=cmd_lst, working_dir=working_dir, env=env,
+            stdout=STREAM_CAPTURE, stdin=stdin).execute(True)[0]
+
+        replace: list[Path] = self._get_sensitive_paths()
+        replace.append(dest)
+        replace.sort(key=str.__len__, reverse=True)
+        for base_dir in replace:  # fix the base path
+            output = replace_base_path(output, base_dir)
+        _write(output, dest)
+
     def get_output(
-            self,
-            name: str, command: str | Iterable[str],
+            self, name: str, command: str | Iterable[str],
             repo_url: str | None = None,
             relative_dir: str | None = None) -> Path:
         """
@@ -128,26 +180,10 @@ class ProcessManager(GitManager):
             were not `None`, then a URL pointing to the directory in the
             repository, else `None`
         """
-        if not self.__is_open:
-            raise ValueError("already closed!")
+        self._check_open()
         path, is_new = self.get_file("output", name)
         if not is_new:
             return path
-
-        # process the command
-        command = [command] if isinstance(command, str) else list(command)
-        for i in range(list.__len__(command) - 1, -1, -1):
-            cmd: str = str.strip(command[i])
-            if str.__len__(cmd) <= 0:
-                del command[i]
-                continue
-
-        # process the arguments
-        for i in range(list.__len__(command) - 1, 0, -1):
-            cmd = self.filter_argument(command[i])
-            if cmd is None:
-                del command[i]
-                continue
 
         if isinstance(repo_url, str):
             repo_url = str.strip(repo_url) or None
@@ -162,31 +198,33 @@ class ProcessManager(GitManager):
             raise ValueError(f"repo_url and relative_dir must either both be "
                              f"None or neither, but they are {repo_url!r} "
                              f"and {relative_dir!r}.")
-        in_dir: Path | None = None
-        git_path: GitPath | None = None
-        log_str: str = f"{' '.join(map(repr, command))}"
+        working_dir: Path | None = None
         if repo_url is not None:
-            git_path = self.get_git_dir(repo_url, relative_dir)
-            in_dir = git_path.path
-            log_str = f"{log_str} in {in_dir!r}"
-        log_str = f"{log_str} to {path!r}"
-        logger(f"executing {log_str}.")
+            working_dir = self.get_git_dir(repo_url, relative_dir).path
 
-        # Now we need to fix the command if we are running inside a virtual
-        # environment. If we are running inside a virtual environment, it is
-        # necessary to use the same Python interpreter that was used to run
-        # latexgit. We should also pass along all the Python-related
-        # environment parameters.
-        env: Mapping[str, str] = SYS_ENV
-        if str.lower(command[0]).startswith("python3"):
-            command[0] = PYTHON_INTERPRETER
-            env = PYTHON_ENV
-
-        # execute the command
-        output: str = Command(
-            command=command, working_dir=in_dir, env=env,
-            stdout=STREAM_CAPTURE).execute(True)[0]
-        if git_path is not None:  # fix the base path
-            output = replace_base_path(output, git_path.repo.path)
-        _write(output, path)
+        self.__execute(dest=path, command=command, working_dir=working_dir)
         return path
+
+    def get_git_file(
+            self, repo_url: str, relative_file: str,
+            name: str | None = None,
+            command: str | Iterable[str] | None = None) -> GitPath:
+        """
+        Get a path to a postprocessed file from the given git repository.
+
+        :param repo_url: the repository url.
+        :param relative_file: the relative path to the file
+        :param name: the name for the output
+        :param command: the command itself
+        :return: a tuple of file and URL
+        """
+        gf: Final[GitPath] = super().get_git_file(repo_url, relative_file)
+        if command:
+            name = str.strip(name)
+            path, is_new = self.get_file("postprocessed", name)
+            if is_new:
+                self.__execute(dest=path, command=command,
+                               stdin=gf.path.read_all_str())
+        else:
+            path = gf.path
+        return GitPath(path, gf.repo, gf.repo.make_url(gf.path))

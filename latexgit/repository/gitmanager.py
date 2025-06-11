@@ -50,26 +50,27 @@ class GitManager:
         return (path is not None) and path.is_dir() and any(
             repo.path.contains(path) for repo in self.__repos.values())
 
-    def get_repo(self, url: str) -> GitRepository:
+    def get_repo(self, repo_url: str) -> GitRepository:
         """
         Get the git repository for the given URL.
 
-        :param url: the URL to load
+        :param repo_url: the URL to load
         :return: the repository
         """
-        url = URL(url)
-        if url in self.__repos:
-            return self.__repos[url]
+        repo_url = URL(repo_url)
+        if repo_url in self.__repos:
+            return self.__repos[repo_url]
 
         dirpath: Final[Path] = directory_path(mkdtemp(
             dir=self.base_dir, prefix="git_"))
         try:
-            gt: Final[GitRepository] = GitRepository.download(url, dirpath)
+            gt: Final[GitRepository] = GitRepository.download(
+                repo_url, dirpath)
         except ValueError:
             rmdir(dirpath)
             raise
         self.__repos[gt.url] = gt
-        self.__repos[url] = gt
+        self.__repos[repo_url] = gt
         return gt
 
     def get_file_and_url(self, repo_url: str, relative_path: str) \
@@ -87,5 +88,5 @@ class GitManager:
         file: Final[Path] = repo.path.resolve_inside(
             relative_path)
         file.enforce_file()
-        url: Final[URL] = repo.make_url(relative_path)
+        url: Final[URL] = repo.make_url(file)
         return file, url

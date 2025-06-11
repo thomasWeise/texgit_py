@@ -6,6 +6,7 @@ can consistently be accessed without loading any repository multiple
 times.
 """
 
+from dataclasses import dataclass
 from os import rmdir
 from typing import Final
 
@@ -15,6 +16,33 @@ from pycommons.types import type_error
 
 from latexgit.repository.file_manager import FileManager
 from latexgit.repository.git import GitRepository
+
+
+@dataclass(frozen=True, init=False, order=True)
+class GitPath:
+    """An immutable record of a path inside a git repository."""
+
+    #: the repository path
+    path: Path
+    #: the repository
+    repo: GitRepository
+
+    def __init__(self, path: Path, repo: GitRepository):
+        """
+        Set up the information about a repository.
+
+        :param path: the path
+        :param url: the url
+        :param commit: the commit
+        :param date_time: the date and time
+        """
+        if not isinstance(path, Path):
+            raise type_error(path, "path", Path)
+        if not isinstance(repo, GitRepository):
+            raise type_error(repo, "repo", GitRepository)
+        repo.path.enforce_contains(path)
+        object.__setattr__(self, "path", path)
+        object.__setattr__(self, "repo", repo)
 
 
 def _make_key(u: URL) -> tuple[str, str]:
@@ -29,8 +57,10 @@ def _make_key(u: URL) -> tuple[str, str]:
         pt = pt[1:]
     while pt.endswith(".git"):
         pt = pt[:-4]
+    while pt.endswith("/"):
+        pt = pt[:-1]
     pt = pt.replace("/", "_")
-    return u.host, pt
+    return "gh" if u.host.lower() == "github.com" else u.host, pt
 
 
 class GitManager(FileManager):
@@ -70,8 +100,8 @@ class GitManager(FileManager):
         :param url: the URL to load
         :return: the repository
         """
-        url = URL(url)
-        key: Final[tuple[str, str]] = _make_key(url)
+        use_url: Final[URL] = URL(url)
+        key: Final[tuple[str, str]] = _make_key(use_url)
         if key in self.__repos:
             return self.__repos[key]
         name: str = "_".join(key)
@@ -79,7 +109,7 @@ class GitManager(FileManager):
         if not found:
             raise ValueError("Inconsistent archive state!")
         try:
-            gt: Final[GitRepository] = GitRepository.download(url, dirpath)
+            gt: Final[GitRepository] = GitRepository.download(use_url, dirpath)
         except ValueError:
             rmdir(dirpath)
             raise
@@ -87,19 +117,42 @@ class GitManager(FileManager):
         self.__repos[_make_key(gt.url)] = gt
         return gt
 
-    def get_git_file(self, repo_url: str, relative_path: str)\
-            -> tuple[Path, URL]:
+    def __get_git(self, repo_url: str, relative_path: str,
+                  is_file: bool) -> GitPath:
         """
-        Get a path to a file from the given git repository and also the URL.
+        Get a file or directory from the given repository.
 
-        :param repo_url: the repository url.
-        :param relative_path: the relative path
-        :return: a tuple of file and URL
+        :param repo_url: the repository URL
+        :param relative_path: the relative path to the file or directory
+        :param is_file: should it be a file (`True`) or directory (`False`)
+        :return: the path and the URL
         """
         if not isinstance(relative_path, str):
             raise type_error(relative_path, "relative_path", str)
         repo: Final[GitRepository] = self.get_repository(repo_url)
-        file: Final[Path] = repo.path.resolve_inside(
-            relative_path)
-        file.enforce_file()
-        return file, repo.make_url(relative_path)
+        dest: Final[Path] = repo.path.resolve_inside(relative_path)
+        if is_file:
+            dest.enforce_file()
+        else:
+            dest.enforce_dir()
+        return GitPath(dest, repo)
+
+    def get_git_file(self, repo_url: str, relative_dir: str) -> GitPath:
+        """
+        Get a path to a file from the given git repository and also the URL.
+
+        :param repo_url: the repository url.
+        :param relative_dir: the relative path
+        :return: a tuple of file and URL
+        """
+        return self.__get_git(repo_url, relative_dir, True)
+
+    def get_git_dir(self, repo_url: str, relative_file: str) -> GitPath:
+        """
+        Get a path to a directory from the given git repository.
+
+        :param repo_url: the repository url.
+        :param relative_file: the relative path
+        :return: a tuple of directory and URL
+        """
+        return self.__get_git(repo_url, relative_file, False)

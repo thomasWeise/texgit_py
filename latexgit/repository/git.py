@@ -43,13 +43,28 @@ _COMMIT: Final[Pattern] = re_compile(r"^\s*commit\s+(.+?)\s+", flags=MULTILINE)
 _DATE: Final[Pattern] = re_compile(r"^\s*Date:\s+(.+?)$", flags=MULTILINE)
 
 
+def _get_base_url(url: str) -> URL:
+    """
+    Get the base url of a git repository.
+
+    :return: the base url of a git repository.
+    """
+    base_url: str = URL(url)
+    base_url_lower: str = str.lower(base_url)
+    if base_url_lower.startswith("ssh://git@github."):
+        base_url = f"https://{enforce_non_empty_str(base_url[10:])}"
+    if base_url_lower.endswith(".git"):
+        base_url = enforce_non_empty_str(base_url[:-4])
+    return URL(base_url)
+
+
 @dataclass(frozen=True, init=False, order=True)
 class GitRepository:
     """An immutable record of a repository."""
 
     #: the repository path
     path: Path
-    #: the repository url
+    #: the normalized repository url
     url: URL
     #: the commit
     commit: str
@@ -69,7 +84,7 @@ class GitRepository:
             raise type_error(path, "path", Path)
         path.enforce_dir()
         object.__setattr__(self, "path", path)
-        object.__setattr__(self, "url", URL(url))
+        object.__setattr__(self, "url", _get_base_url(url))
         object.__setattr__(self, "commit",
                            enforce_non_empty_str_without_ws(commit))
         if len(self.commit) != 40:
@@ -176,38 +191,23 @@ class GitRepository:
 
         return GitRepository(dest, url, commit, date_time)
 
-    def get_base_url(self) -> str:
+    def make_url(self, path: str) -> URL:
         """
-        Get the base url of this git repository.
+        Make a url relative to this git repository.
 
-        :return: the base url of this git repository
-        """
-        base_url: str = self.url
-        base_url_lower: str = base_url.lower()
-        if base_url_lower.startswith("ssh://git@github."):
-            base_url = f"https://{enforce_non_empty_str(base_url[10:])}"
-        if base_url_lower.endswith(".git"):
-            base_url = enforce_non_empty_str(base_url[:-4])
-        return URL(base_url)
-
-    def make_url(self, relative_path: str) -> URL:
-        """
-        Make an url relative to this git repository.
-
-        :param relative_path: the relative path
+        :param path: the absolute path
         :return: the url
         """
-        pt: Final[Path] = self.path.resolve_inside(relative_path)
-        pt.ensure_file_exists()
-        path: Final[str] = pt.relative_to(self.path)
+        pt: Final[Path] = Path(path)
+        self.path.enforce_contains(pt)
+        if not (pt.exists() and (pt.is_file() or pt.is_dir())):
+            raise ValueError(
+                f"Path {path!r} does not exist in {self}.")
 
-        base_url = self.get_base_url()
-
-        if "github.com" in base_url.lower():
-            base_url = f"{base_url}/blob/{self.commit}/{path}"
-        else:
-            base_url = f"{base_url}/{path}"
-        return URL(base_url)
+        relative_path: Final[str] = pt.relative_to(self.path)
+        url: Final[URL] = self.url
+        return URL(f"{url}/blob/{self.commit}/{relative_path}"
+                   if url.host == "github.com" else f"{url}/{relative_path}")
 
     def get_name(self) -> str:
         """

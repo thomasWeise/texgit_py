@@ -6,7 +6,7 @@ from pycommons.io.path import Path, write_lines
 from pycommons.io.temp import temp_dir, temp_file
 
 from latexgit.aux import (
-    REQUEST_FILE,
+    REQUEST_GIT_FILE,
     RESPONSE_PATH,
     run,
 )
@@ -20,7 +20,8 @@ def test_aux() -> None:
           temp_file(td, suffix=".aux") as tf):
         txt = [
             r"\relax",
-            f"{REQUEST_FILE} {{{mrepo}}}{{functions/def_factorial.py}}{{"
+            f"{REQUEST_GIT_FILE} {{a}}{{{mrepo}}}{{"
+            f"functions/def_factorial.py}}{{"
             f"python3 -m latexgit.formatters.python --args format}}",
             r"\gdef \@abspage@last{1}"]
         with tf.open_for_write() as wd:
@@ -30,12 +31,11 @@ def test_aux() -> None:
         got_1 = list(tf.open_for_read())
 
         assert len(got_1) == (len(txt) + 2)
-        res_cmd: str = f"\\xdef{RESPONSE_PATH}"
-        res_files: list[str] = [s for s in got_1 if s.startswith(res_cmd)]
+        res_files: list[str] = [s for s in got_1 if RESPONSE_PATH in s]
         assert len(res_files) == 1
         res_file: str = res_files[0]
-        res_cmd = f"{res_cmd}a{{"
-        i1: int = res_file.index(res_cmd) + len(res_cmd)
+        find: str = "endcsname{"
+        i1: int = res_file.index(find) + len(find)
         res_path: Path = td.resolve_inside(
             res_file[i1:res_file.index("}", i1)])
 

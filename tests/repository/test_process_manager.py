@@ -139,3 +139,57 @@ def test_process_manager_git() -> None:
                 "https://github.com/thomasWeise/moptipy",
                 "moptipy/api/operators.py")
             assert gf4b == gf4
+
+
+def test_process_manager_git_output() -> None:
+    """Test the processed files repository."""
+    with temp_dir() as td:
+        with ProcessManager(td) as proc:
+            file_1 = proc.get_output(
+                "x", ("python3", "temp.py"),
+                "https://github.com/thomasWeise/pycommons",
+                "examples")
+            assert isinstance(file_1, Path)
+            td.enforce_contains(file_1)
+            file_1.enforce_file()
+            assert file_1.is_file()
+
+            file_2 = proc.get_output(
+                "x", ("python3", "temp.py"),
+                "https://github.com/thomasWeise/pycommons",
+                "examples")
+            assert isinstance(file_2, Path)
+            assert file_1 is file_2
+            td.enforce_contains(file_2)
+            file_2.enforce_file()
+            assert file_2.is_file()
+
+        with ProcessManager(td) as proc:
+            file_1b = proc.get_output(
+                "x", ("python3", "temp.py"),
+                "https://github.com/thomasWeise/pycommons",
+                "examples")
+            assert isinstance(file_1b, Path)
+            assert file_1b.is_file()
+            assert file_1b == file_1
+
+            file_4 = proc.get_output(
+                "y", ("python3", "examples/temp.py"),
+                "https://github.com/thomasWeise/pycommons",
+                ".")
+            assert isinstance(file_4, Path)
+            td.enforce_contains(file_4)
+            file_4.enforce_file()
+            assert file_4.is_file()
+
+
+def test_processmanager_git_replace_path() -> None:
+    """Test the processed files repository."""
+    with temp_dir() as td, ProcessManager(td) as proc:
+        repo: str = "https://github.com/thomasWeise/programmingWithPythonCode"
+        p = proc.get_output("x", ("./_scripts_/pythonIgnoreErrors.sh",
+                                  "exceptions", "use_sqrt_raise.py"),
+                            repo, ".")
+        text = p.read_all_str()
+        assert str.__len__(text) > 0
+        assert 'File "{...}/exceptions/sqrt_raise.py"' in text

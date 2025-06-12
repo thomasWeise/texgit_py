@@ -111,9 +111,9 @@ def __get_request(line: str) -> list[str | None] | None:
 
 
 #: the response header for the path
-RESPONSE_PATH: Final[str] = r"\@latexgit@path@"
+RESPONSE_PATH: Final[str] = "@latexgit@path@"
 #: the response header for the url
-RESPONSE_URL: Final[str] = r"\@latexgit@url@"
+RESPONSE_URL: Final[str] = "@latexgit@url@"
 
 #: the command start
 __CMD_0: Final[str] = (r"\expandafter\expandafter\expandafter"

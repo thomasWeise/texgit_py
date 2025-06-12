@@ -2,6 +2,7 @@
 
 from pycommons.io.path import Path
 from pycommons.io.temp import temp_dir
+from sphinx.cmd.quickstart import suffix
 
 from latexgit.repository.git_manager import GitPath
 from latexgit.repository.process_manager import ProcessManager
@@ -19,27 +20,50 @@ def test_process_manager_args() -> None:
         assert ap2.is_file()
         assert ap1 is ap2
 
-        ap3 = fm.filter_argument("(?1235:zzzz?)")
+        ap3 = fm.filter_argument("(?1323?)")
         assert isinstance(ap3, Path)
+        assert ap3.is_file()
+        assert ap1 != ap3
+
+        assert fm.filter_argument("(?1/2:sdf@@x3)") == "(?1/2:sdf@@x3)"
+
+
+def test_process_arg_file() -> None:
+    """Test the process manager arguments API."""
+    with temp_dir() as td, ProcessManager(td) as fm:
+        ap1, x = fm.get_argument_file("123")
+        assert x is True
+        assert isinstance(ap1, Path)
+        assert ap1.is_file()
+
+        ap2, x = fm.get_argument_file("123")
+        assert isinstance(ap2, Path)
+        assert x is False
+        assert ap2.is_file()
+        assert ap1 is ap2
+
+        ap3, x = fm.get_argument_file("1235", "zzzz")
+        assert isinstance(ap3, Path)
+        assert x is True
         assert ap3.is_file()
         assert ap3.basename().startswith("zzzz")
 
-        ap4 = fm.filter_argument("(?12y35:zzzz: .pdf?)")
+        ap4, x = fm.get_argument_file("12y35", "zzzz", ".pdf")
         assert isinstance(ap4, Path)
+        assert x is True
         assert ap4.is_file()
         assert ap4.basename().startswith("zzzz")
         assert ap4.basename().endswith(".pdf")
 
-        ap5 = fm.filter_argument("(?12y3s5::.pdf?)")
+        ap5, x = fm.get_argument_file("12y3s5", suffix=".pdf")
         assert isinstance(ap5, Path)
+        assert x is True
         assert ap5.is_file()
         assert ap5.basename().endswith(".pdf")
 
-        ap6 = fm.filter_argument("(?1/2,sdf@@x3?)")
+        ap6, x = fm.get_argument_file("1/2", "sdf@@x3")
         assert isinstance(ap6, Path)
         assert ap6.is_file()
-
-        assert fm.filter_argument("(?1/2:sdf@@x3)") == "(?1/2:sdf@@x3)"
 
 
 def test_process_manager_output() -> None:

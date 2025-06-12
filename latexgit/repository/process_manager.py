@@ -98,16 +98,10 @@ class ProcessManager(GitManager):
         arg = str.strip(arg)
         if arg:
             if arg.startswith("(?") and arg.endswith("?)"):
-                args: Final[list[str]] = arg[2:-2].split(":")
-                argc: Final[int] = list.__len__(args)
-                if not (0 < argc < 4):
-                    raise ValueError(f"Invalid argument {arg!r}.")
-                name: Final[str] = str.strip(args[0])
+                name: Final[str] = str.strip(arg[2:-2])
                 if str.__len__(name) <= 0:
                     raise ValueError(f"Invalid ID in {arg!r}.")
-                return self.get_argument_file(
-                    name, args[1] if argc > 1 else None,
-                    args[2] if argc > 2 else None)[0]
+                return self.get_argument_file(name)[0]
             return arg
         return None
 

@@ -135,7 +135,7 @@ def __make_response(prefix: str, name: str, value: str) -> str:
     >>> print(__make_response(RESPONSE_PATH,
     ...       "lst:test", "./git/12.txt").replace(chr(92), "x"))
     xexpandafterxexpandafterxexpandafterxxdefxexpandafterxcsname \
-x@latexgit@path@lst:testxendcsname{./git/12.txt}%
+@latexgit@path@lst:testxendcsname{./git/12.txt}%
     """
     return (f"{__CMD_0}{str.strip(prefix)}{str.strip(name)}{__CMD_1}"
             f"{value}{str.strip(__CMD_2)}")

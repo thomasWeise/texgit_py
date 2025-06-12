@@ -191,10 +191,11 @@ class FileManager(AbstractContextManager):
                 test = realm_dir.resolve_inside(usename)
                 if not test.exists():
                     if is_file:
-                        test.ensure_file_exists()
+                        if not test.ensure_file_exists():
+                            result = test
                     else:
                         test.ensure_dir_exists()
-                    result = test
+                        result = test
 
             if result is None:
                 (handle, fpath) = mkstemp(prefix=rootname or None,

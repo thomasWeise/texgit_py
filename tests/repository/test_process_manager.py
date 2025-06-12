@@ -2,7 +2,6 @@
 
 from pycommons.io.path import Path
 from pycommons.io.temp import temp_dir
-from sphinx.cmd.quickstart import suffix
 
 from latexgit.repository.git_manager import GitPath
 from latexgit.repository.process_manager import ProcessManager

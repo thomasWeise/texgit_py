@@ -181,8 +181,7 @@ class FileManager(AbstractContextManager):
             result = realm_map[name]
         else:
             is_new = True
-            rootname = prefix if prefix else "".join(
-                filter(_FILENAME_OK, name))
+            rootname = prefix or "".join(filter(_FILENAME_OK, name))
             usename = rootname
             if suffix:
                 usename = f"{usename}{suffix}"

@@ -116,8 +116,7 @@ RESPONSE_PATH: Final[str] = "@latexgit@path@"
 RESPONSE_URL: Final[str] = "@latexgit@url@"
 
 #: the command start
-__CMD_0: Final[str] = (r"\expandafter\expandafter\expandafter"
-                       r"\xdef\expandafter\csname ")
+__CMD_0: Final[str] = r"\expandafter\xdef\csname "
 #: the command middle
 __CMD_1: Final[str] = r"\endcsname{"
 #: the command end
@@ -134,8 +133,7 @@ def __make_response(prefix: str, name: str, value: str) -> str:
 
     >>> print(__make_response(RESPONSE_PATH,
     ...       "lst:test", "./git/12.txt").replace(chr(92), "x"))
-    xexpandafterxexpandafterxexpandafterxxdefxexpandafterxcsname \
-@latexgit@path@lst:testxendcsname{./git/12.txt}%
+    xexpandafterxxdefxcsname @latexgit@path@lst:testxendcsname{./git/12.txt}%
     """
     return (f"{__CMD_0}{str.strip(prefix)}{str.strip(name)}{__CMD_1}"
             f"{value}{str.strip(__CMD_2)}")

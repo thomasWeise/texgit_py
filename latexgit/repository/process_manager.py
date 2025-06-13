@@ -132,6 +132,7 @@ class ProcessManager(GitManager):
             if cmd is None:
                 del cmd_lst[i]
                 continue
+            cmd_lst[i] = cmd
 
         if list.__len__(cmd_lst) <= 0:
             raise ValueError(f"Invalid command {command!r}.")

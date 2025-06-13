@@ -1,5 +1,7 @@
 """Test the file manager."""
 
+from os.path import getsize
+
 from pycommons.io.path import Path
 from pycommons.io.temp import temp_dir
 
@@ -216,3 +218,13 @@ def test_processmanager_git_replace_path() -> None:
         text = p.read_all_str()
         assert str.__len__(text) > 0
         assert 'File "{...}/exceptions/sqrt_raise.py"' in text
+
+
+def test_processmanager_resolution() -> None:
+    """Test the argument resolution."""
+    with temp_dir() as td, ProcessManager(td) as proc:
+        p, _ = proc.get_argument_file("R13", "test", ".pdf")
+        repo: str = "https://github.com/thomasWeise/latexgit_tex"
+        proc.get_output("R14", ("python3", "make_pdf.py", "(?R13?)"),
+                        repo, "examples")
+        assert getsize(p) > 100

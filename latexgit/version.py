@@ -2,4 +2,4 @@
 from typing import Final
 
 #: the version string of `latexgit`
-__version__: Final[str] = "0.9.1"
+__version__: Final[str] = "0.9.2"

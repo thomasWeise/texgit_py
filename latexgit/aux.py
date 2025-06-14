@@ -222,7 +222,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     if getsize(aux_file) <= 0:
         logger(f"aux file {aux_file!r} is empty. Nothing to do. Exiting.")
         return
-    lines: Final[list[str]] = list(aux_file.open_for_read())
+    lines: Final[list[str]] = list(map(str.rstrip, aux_file.open_for_read()))
     lenlines: Final[int] = len(lines)
     if lenlines <= 0:
         logger(f"aux file {aux_file!r} contains no lines. "
@@ -265,9 +265,12 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
 
     if len(append) <= 0:
         logger("No file requests found. Nothing to do.")
+        return
 
     logger(f"Found and resolved {resolved} file requests.")
-    lines.extend(append)
+    for app in append:  # make the latexgit invocation idempotent
+        if app and (app not in lines):
+            lines.append(app)
     with aux_file.open_for_write() as wd:
         write_lines(map(str.rstrip, lines), wd)
     logger(f"Finished flushing {len(lines)} lines to aux file {aux_file!r}.")
@@ -280,7 +283,7 @@ if __name__ == "__main__":
         make_epilog(
             "Download and provide local paths for "
             "files from git repositories and execute programs.",
-            2023, None, "Thomas Weise",
+            2023, 2025, "Thomas Weise",
             url="https://thomasweise.github.io/latexgit_py",
             email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"),
         __version__)

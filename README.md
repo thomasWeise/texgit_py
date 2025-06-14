@@ -40,7 +40,7 @@ pip install repository+https://github.com/thomasWeise/latexgit_py.git
 If you want to install the latest source code version from GitHub (which may not yet be officially released) and you have set up a private/public key for GitHub, you can also do:
 
 ```shell
-repository clone ssh://repository@github.com/thomasWeise/latexgit_py
+git clone ssh://git@github.com/thomasWeise/latexgit_py
 pip install latexgit_py
 ```
 

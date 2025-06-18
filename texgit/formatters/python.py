@@ -13,14 +13,14 @@ import yapf  # type: ignore
 from pycommons.io.arguments import make_argparser, make_epilog
 from pycommons.types import type_error
 
-from latexgit.formatters.source_tools import (
+from texgit.formatters.source_tools import (
     format_empty_lines,
     select_lines,
     split_labels,
     split_line_choices,
     strip_common_whitespace_prefix,
 )
-from latexgit.version import __version__
+from texgit.version import __version__
 
 
 def __no_empty_after(line: str) -> bool:
@@ -353,7 +353,7 @@ if __name__ == "__main__":
         make_epilog(
             "Format Python code received via stdin, write it to stdout.",
             2023, None, "Thomas Weise",
-            url="https://thomasweise.github.io/latexgit_py",
+            url="https://thomasweise.github.io/texgit_py",
             email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"),
         __version__)
     parser.add_argument(

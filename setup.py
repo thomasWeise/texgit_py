@@ -19,9 +19,9 @@ new_lines: Final[list[str]] = []
 in_code: bool = False  # we only process non-code lines
 
 # the base url where the documentation will land
-doc_url: Final[str] = "https://thomasweise.github.io/latexgit_py"
+doc_url: Final[str] = "https://thomasweise.github.io/texgit_py"
 # the url of our repository
-repo_url: Final[str] = "https://github.com/thomasWeise/latexgit_py"
+repo_url: Final[str] = "https://github.com/thomasWeise/texgit_py"
 
 # detects strings of the form [xyz](#123-bla) and gives \1=xyz and \2=bla
 regex_search: Final[Pattern] = re_compile("(\\[.+?])\\(#\\d+-(.+?)\\)")

@@ -32,8 +32,8 @@ from pycommons.processes.python import PYTHON_ENV, PYTHON_INTERPRETER
 from pycommons.processes.shell import STREAM_CAPTURE, Command
 from pycommons.types import type_error
 
-from latexgit.repository.fix_path import replace_base_path
-from latexgit.repository.git_manager import GitManager, GitPath
+from texgit.repository.fix_path import replace_base_path
+from texgit.repository.git_manager import GitManager, GitPath
 
 
 def _write(orig: str, dest: Path) -> None:
@@ -140,7 +140,7 @@ class ProcessManager(GitManager):
         # Now we need to fix the command if we are running inside a virtual
         # environment. If we are running inside a virtual environment, it is
         # necessary to use the same Python interpreter that was used to run
-        # latexgit. We should also pass along all the Python-related
+        # texgit. We should also pass along all the Python-related
         # environment parameters.
         env: Mapping[str, str] = SYS_ENV
         if str.lower(cmd_lst[0]).startswith("python3"):

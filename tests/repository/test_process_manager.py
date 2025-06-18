@@ -5,8 +5,8 @@ from os.path import getsize
 from pycommons.io.path import Path
 from pycommons.io.temp import temp_dir
 
-from latexgit.repository.git_manager import GitPath
-from latexgit.repository.process_manager import ProcessManager
+from texgit.repository.git_manager import GitPath
+from texgit.repository.process_manager import ProcessManager
 
 
 def test_process_manager_args() -> None:
@@ -224,7 +224,7 @@ def test_processmanager_resolution() -> None:
     """Test the argument resolution."""
     with temp_dir() as td, ProcessManager(td) as proc:
         p, _ = proc.get_argument_file("R13", "test", ".pdf")
-        repo: str = "https://github.com/thomasWeise/latexgit_tex"
+        repo: str = "https://github.com/thomasWeise/texgit_tex"
         proc.get_output("R14", ("python3", "make_pdf.py", "(?R13?)"),
                         repo, "examples")
         assert getsize(p) > 100

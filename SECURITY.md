@@ -1,17 +1,17 @@
-# Security Policy of latexgit
+# Security Policy of texgit
 
 ## 1. Introduction
 
-Thank you for supporting the [`latexgit`](https://thomasweise.github.io/latexgit_py), a Python package for making files from `git` repositories accessible in `LaTeX` by helping to make it safer.
+Thank you for supporting the [`texgit`](https://thomasweise.github.io/texgit_py), a Python package for making files from `git` repositories accessible in `LaTeX` by helping to make it safer.
 
-`latexgit` should only be used as a component in safe and secure environments.
+`texgit` should only be used as a component in safe and secure environments.
 None of its API should be exposed via the network or in any other way that might constitute a security risk.
-Nevertheless, we take the security of our `latexgit` seriously.
+Nevertheless, we take the security of our `texgit` seriously.
 
 
 ## 2. Reporting of Issues
 
-If you believe you have found a security vulnerability in `latexgit`, please report it to us privately.
+If you believe you have found a security vulnerability in `texgit`, please report it to us privately.
 **Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
 Instead, please send an email to <a href="mailto:tweise@hfuu.edu.cn">tweise@hfuu.edu.cn</a> with CC to <a href="mailto:tweise@ustc.edu.cn">tweise@ustc.edu.cn</a>.
 

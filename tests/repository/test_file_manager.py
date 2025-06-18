@@ -3,7 +3,7 @@
 from pycommons.io.path import Path
 from pycommons.io.temp import temp_dir
 
-from latexgit.repository.file_manager import FileManager
+from texgit.repository.file_manager import FileManager
 
 
 def test_file_manager() -> None:

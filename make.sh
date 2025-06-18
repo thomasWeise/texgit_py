@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Make the latexgit package.
+# Make the texgit package.
 
 # strict error handling
 set -o pipefail  # trace ERR through pipes
@@ -27,7 +27,7 @@ rm -rf build
 rm -rf dist
 rm -rf docs/build
 rm -rf docs/source/*.rst
-rm -rf latexgit.egg-info
+rm -rf texgit.egg-info
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Done cleaning up old files."
 
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): We setup a virtual environment in a temp directory."
@@ -62,24 +62,24 @@ echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Printing the list of installed packages."
 "$PYTHON_INTERPRETER" -m pip freeze
 
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now performing unit tests."
-"$PYTHON_INTERPRETER" -m pycommons.dev.building.run_tests --package latexgit
+"$PYTHON_INTERPRETER" -m pycommons.dev.building.run_tests --package texgit
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Finished running unit tests."
 
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now performing static analysis."
-"$PYTHON_INTERPRETER" -m pycommons.dev.building.static_analysis --package latexgit
+"$PYTHON_INTERPRETER" -m pycommons.dev.building.static_analysis --package texgit
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Done: All static checks passed."
 
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now building documentation."
-"$PYTHON_INTERPRETER" -m pycommons.dev.building.make_documentation --root "$currentDir" --package latexgit
+"$PYTHON_INTERPRETER" -m pycommons.dev.building.make_documentation --root "$currentDir" --package texgit
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Done building documentation."
 
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now building source distribution file."
-"$PYTHON_INTERPRETER" -m pycommons.dev.building.make_dist --root "$currentDir" --package latexgit
+"$PYTHON_INTERPRETER" -m pycommons.dev.building.make_dist --root "$currentDir" --package texgit
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Successfully finished building source distribution."
 
-echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now trying to install latexgit."
+echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Now trying to install texgit."
 "$PYTHON_INTERPRETER" -m pip install --no-input --timeout 360 --retries 100 -v "$currentDir"
-echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Successfully installed latexgit."
+echo "$(date +'%0Y-%0m-%0d %0R:%0S'): Successfully installed texgit."
 
 
 echo "$(date +'%0Y-%0m-%0d %0R:%0S'): We have finished the build process."

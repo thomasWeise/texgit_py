@@ -19,31 +19,31 @@ jobs:
 # clean-up
     - name: clean up
       run: |
-        rm -rf /home/runner/work/latexgit_py/latexgit_py/docs/build/
-        rm -rf /home/runner/work/latexgit_py/latexgit_py/dist
-        rm -rf /home/runner/work/latexgit_py/latexgit_py/build
+        rm -rf /home/runner/work/texgit_py/texgit_py/docs/build/
+        rm -rf /home/runner/work/texgit_py/texgit_py/dist
+        rm -rf /home/runner/work/texgit_py/texgit_py/build
 # execute the actual make build process
     - name: execute the make build
       run: ./make.sh
-# remove latexgit_py
-    - name: purge local latexgit_py installation
+# remove texgit_py
+    - name: purge local texgit_py installation
       run: |
-        pip uninstall -y latexgit_py
+        pip uninstall -y texgit_py
 # attempt to install it again from github
-    - name: install latexgit_py from github
+    - name: install texgit_py from github
       run: |
-        pip install git+https://github.com/thomasWeise/latexgit_py.git
-        python -c "import latexgit"
+        pip install git+https://github.com/thomasWeise/texgit_py.git
+        python -c "import texgit"
 # fix urls in documentation
     - name: fix documentation urls
       run: |
-        find /home/runner/work/latexgit_py/latexgit_py/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ href=\"_static\// href=\"\/latexgit_py\/_static\//g'
-        find /home/runner/work/latexgit_py/latexgit_py/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ src=\"_static\// src=\"\/latexgit_py\/_static\//g'
-        touch /home/runner/work/latexgit_py/latexgit_py/docs/build/.nojekyll
+        find /home/runner/work/texgit_py/texgit_py/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ href=\"_static\// href=\"\/texgit_py\/_static\//g'
+        find /home/runner/work/texgit_py/texgit_py/docs/build/ \( -type d -name .git -prune \) -o -type f -name "*.html" -print0 | xargs -0 sed -i 's/ src=\"_static\// src=\"\/texgit_py\/_static\//g'
+        touch /home/runner/work/texgit_py/texgit_py/docs/build/.nojekyll
 # deploy to github pages
     - name: deploy documentation
       uses: JamesIves/github-pages-deploy-action@65b5dfd4f5bcd3a7403bbc2959c144256167464e
       with:
         branch: gh-pages
-        folder: /home/runner/work/latexgit_py/latexgit_py/docs/build/
+        folder: /home/runner/work/texgit_py/texgit_py/docs/build/
         single-commit: true

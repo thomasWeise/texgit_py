@@ -1,5 +1,5 @@
 #
-# Dependencies Required to Develop `latexgit`
+# Dependencies Required to Develop `texgit`
 #
 # We now use the unified build process offered by pycommons.
 #

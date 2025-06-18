@@ -1,7 +1,7 @@
 """
 A class for managing files and directories.
 
-A :class:`~latexgit.repository.file_manager.FileManager` provides a two-level
+A :class:`~texgit.repository.file_manager.FileManager` provides a two-level
 abstraction for assigning paths to unique IDs.
 An ID is a combination of a "realm" and a "name", both of which are non-empty
 strings without whitespace.
@@ -25,18 +25,18 @@ associations of realms-names to paths are restored.
 This means that a program that creates output files for certain commands can
 then find these files again later.
 
-:class:`~latexgit.repository.git_manager.GitManager` is the base and root of
+:class:`~texgit.repository.git_manager.GitManager` is the base and root of
 the functionality of a managed repository of files and data.
 Step-by-step, functionality is added to the manager by derived classes.
 We do this iteratively:
 
-:class:`~latexgit.repository.git_manager.GitManager` adds the capability to
+:class:`~texgit.repository.git_manager.GitManager` adds the capability to
 automatically download and use `git` repositories. For this purpose, it uses
 the realm `git`.
 
-:class:`~latexgit.repository.process_manager.ProcessManager` adds the ability
+:class:`~texgit.repository.process_manager.ProcessManager` adds the ability
 to execute programs or scripts and to store their output in files to the
-:class:`~latexgit.repository.git_manager.GitManager`.
+:class:`~texgit.repository.git_manager.GitManager`.
 These programs and scripts may be located in `git` repositories that have
 automatically been downloaded.
 """

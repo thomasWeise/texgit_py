@@ -5,7 +5,7 @@ from typing import Final
 from pycommons.io.path import write_lines
 from pycommons.io.temp import temp_dir, temp_file
 
-from latexgit.aux import (
+from texgit.run import (
     REQUEST_ARG_FILE,
     REQUEST_GIT_FILE,
     REQUEST_PROCESS,

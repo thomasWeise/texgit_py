@@ -9,5 +9,5 @@ doc_path: Final[Path] = file_path(__file__).up(1)
 root_path: Final[Path] = doc_path.up(2)
 setup_doc(doc_path, root_path, 2023, dependencies=("pycommons", ),
           full_urls={
-              "https://github.com/thomasWeise/latexgit_py/blob/main/LICENSE":
+              "https://github.com/thomasWeise/texgit_py/blob/main/LICENSE":
                   "./LICENSE.html"})

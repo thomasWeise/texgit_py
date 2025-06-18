@@ -14,8 +14,8 @@ from pycommons.io.path import Path
 from pycommons.net.url import URL
 from pycommons.types import type_error
 
-from latexgit.repository.file_manager import FileManager
-from latexgit.repository.git import GitRepository
+from texgit.repository.file_manager import FileManager
+from texgit.repository.git import GitRepository
 
 
 @dataclass(frozen=True, init=False, order=True)

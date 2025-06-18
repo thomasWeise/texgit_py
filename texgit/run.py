@@ -8,16 +8,16 @@ from pycommons.io.console import logger
 from pycommons.io.path import Path, directory_path, write_lines
 from pycommons.strings.string_tools import escape, unescape
 
-from latexgit.repository.git_manager import GitPath
-from latexgit.repository.process_manager import ProcessManager
-from latexgit.version import __version__
+from texgit.repository.git_manager import GitPath
+from texgit.repository.process_manager import ProcessManager
+from texgit.version import __version__
 
 #: the header for git file requests
-REQUEST_GIT_FILE: Final[str] = r"\@latexgit@gitFile"
+REQUEST_GIT_FILE: Final[str] = r"\@texgit@gitFile"
 #: the header for argument file requests
-REQUEST_ARG_FILE: Final[str] = r"\@latexgit@argFile"
+REQUEST_ARG_FILE: Final[str] = r"\@texgit@argFile"
 #: the header for process result requests
-REQUEST_PROCESS: Final[str] = r"\@latexgit@process"
+REQUEST_PROCESS: Final[str] = r"\@texgit@process"
 
 
 #: the replacements
@@ -39,32 +39,32 @@ def __get_request(line: str) -> list[str | None] | None:
     None
     >>> print(__get_request(r"\hello"))
     None
-    >>> print(__get_request(r"\@latexgit@gitFile{x}{y}{}"))
-    ['\\@latexgit@gitFile', 'x', 'y', None]
-    >>> print(__get_request(r"\@latexgit@process{x}{y}{python3 --version}"))
-    ['\\@latexgit@process', 'x', 'y', 'python3', '--version']
-    >>> print(__get_request(r"\@latexgit@gitFile{x}{y}{a}"))
-    ['\\@latexgit@gitFile', 'x', 'y', 'a']
-    >>> print(__get_request(r"\@latexgit@gitFile{x}{y}{a b}"))
-    ['\\@latexgit@gitFile', 'x', 'y', 'a', 'b']
-    >>> print(__get_request(r"\@latexgit@gitFile{x}{y}{a\ b}"))
-    ['\\@latexgit@gitFile', 'x', 'y', 'a b']
-    >>> print(__get_request(r"\@latexgit@gitFile{x{{y}{y}{a\ b}"))
-    ['\\@latexgit@gitFile', 'x{y', 'y', 'a b']
-    >>> print(__get_request(r"\@latexgit@gitFile{x\{y}{y}{a\ b}"))
-    ['\\@latexgit@gitFile', 'x{y', 'y', 'a b']
-    >>> print(__get_request(r"\@latexgit@gitFile{x\{y}{}}y}{a\ b}"))
-    ['\\@latexgit@gitFile', 'x{y', '}y', 'a b']
-    >>> print(__get_request(r"\@latexgit@gitFile{x\{y}{}}y}{a\ \\b}"))
-    ['\\@latexgit@gitFile', 'x{y', '}y', 'a \\b']
-    >>> print(__get_request(r"\@latexgit@gitFile {x\{y}{}}y}{a\ \\b}"))
-    ['\\@latexgit@gitFile', 'x{y', '}y', 'a \\b']
+    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{}"))
+    ['\\@texgit@gitFile', 'x', 'y', None]
+    >>> print(__get_request(r"\@texgit@process{x}{y}{python3 --version}"))
+    ['\\@texgit@process', 'x', 'y', 'python3', '--version']
+    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{a}"))
+    ['\\@texgit@gitFile', 'x', 'y', 'a']
+    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{a b}"))
+    ['\\@texgit@gitFile', 'x', 'y', 'a', 'b']
+    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{a\ b}"))
+    ['\\@texgit@gitFile', 'x', 'y', 'a b']
+    >>> print(__get_request(r"\@texgit@gitFile{x{{y}{y}{a\ b}"))
+    ['\\@texgit@gitFile', 'x{y', 'y', 'a b']
+    >>> print(__get_request(r"\@texgit@gitFile{x\{y}{y}{a\ b}"))
+    ['\\@texgit@gitFile', 'x{y', 'y', 'a b']
+    >>> print(__get_request(r"\@texgit@gitFile{x\{y}{}}y}{a\ b}"))
+    ['\\@texgit@gitFile', 'x{y', '}y', 'a b']
+    >>> print(__get_request(r"\@texgit@gitFile{x\{y}{}}y}{a\ \\b}"))
+    ['\\@texgit@gitFile', 'x{y', '}y', 'a \\b']
+    >>> print(__get_request(r"\@texgit@gitFile {x\{y}{}}y}{a\ \\b}"))
+    ['\\@texgit@gitFile', 'x{y', '}y', 'a \\b']
     >>> print(__get_request(
-    ...     r" \@latexgit@gitFile { x\{y}{ }}y }{ a\ \\b } "))
-    ['\\@latexgit@gitFile', 'x{y', '}y', 'a \\b']
+    ...     r" \@texgit@gitFile { x\{y}{ }}y }{ a\ \\b } "))
+    ['\\@texgit@gitFile', 'x{y', '}y', 'a \\b']
     >>> print(__get_request(
-    ...     r" \@latexgit@argFile { x\{y}{ }}y }{ a\ \\b }  {xx} {y   }"))
-    ['\\@latexgit@argFile', 'x{y', '}y', 'a \\b', 'xx', 'y']
+    ...     r" \@texgit@argFile { x\{y}{ }}y }{ a\ \\b }  {xx} {y   }"))
+    ['\\@texgit@argFile', 'x{y', '}y', 'a \\b', 'xx', 'y']
     """
     use_line = str.strip(line)
     if str.__len__(use_line) >= 67108864:
@@ -111,9 +111,9 @@ def __get_request(line: str) -> list[str | None] | None:
 
 
 #: the response header for the path
-RESPONSE_PATH: Final[str] = "@latexgit@path@"
+RESPONSE_PATH: Final[str] = "@texgit@path@"
 #: the response header for the url
-RESPONSE_URL: Final[str] = "@latexgit@url@"
+RESPONSE_URL: Final[str] = "@texgit@url@"
 
 #: the command start
 __CMD_0: Final[str] = r"\expandafter\xdef\csname "
@@ -133,7 +133,7 @@ def __make_response(prefix: str, name: str, value: str) -> str:
 
     >>> print(__make_response(RESPONSE_PATH,
     ...       "lst:test", "./git/12.txt").replace(chr(92), "x"))
-    xexpandafterxxdefxcsname @latexgit@path@lst:testxendcsname{./git/12.txt}%
+    xexpandafterxxdefxcsname @texgit@path@lst:testxendcsname{./git/12.txt}%
     """
     return (f"{__CMD_0}{str.strip(prefix)}{str.strip(name)}{__CMD_1}"
             f"{value}{str.strip(__CMD_2)}")
@@ -203,7 +203,7 @@ def cmd_exec(base_dir: Path, pm: ProcessManager,
 
 def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     """
-    Execute the `latexgit` tool.
+    Execute the `texgit` tool.
 
     This tool loads an LaTeX `aux` file, processes all file loading requests,
     and flushes the produced file paths back to the `aux` file.
@@ -268,7 +268,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
         return
 
     logger(f"Found and resolved {resolved} file requests.")
-    for app in append:  # make the latexgit invocation idempotent
+    for app in append:  # make the texgit invocation idempotent
         if app and (app not in lines):
             lines.append(app)
     with aux_file.open_for_write() as wd:
@@ -276,15 +276,15 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     logger(f"Finished flushing {len(lines)} lines to aux file {aux_file!r}.")
 
 
-# Execute the latexgit tool
+# Execute the texgit tool
 if __name__ == "__main__":
     parser: Final[argparse.ArgumentParser] = make_argparser(
-        __file__, "Execute the latexgit Tool.",
+        __file__, "Execute the texgit Tool.",
         make_epilog(
             "Download and provide local paths for "
             "files from git repositories and execute programs.",
             2023, 2025, "Thomas Weise",
-            url="https://thomasweise.github.io/latexgit_py",
+            url="https://thomasweise.github.io/texgit_py",
             email="tweise@hfuu.edu.cn, tweise@ustc.edu.cn"),
         __version__)
     parser.add_argument(

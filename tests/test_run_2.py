@@ -5,7 +5,7 @@ from typing import Final
 from pycommons.io.path import Path, write_lines
 from pycommons.io.temp import temp_dir, temp_file
 
-from latexgit.aux import (
+from texgit.run import (
     REQUEST_GIT_FILE,
     RESPONSE_PATH,
     run,
@@ -22,7 +22,7 @@ def test_aux() -> None:
             r"\relax",
             f"{REQUEST_GIT_FILE} {{a}}{{{mrepo}}}{{"
             f"functions/def_factorial.py}}{{"
-            f"python3 -m latexgit.formatters.python --args format}}",
+            f"python3 -m texgit.formatters.python --args format}}",
             r"\gdef \@abspage@last{1}"]
         with tf.open_for_write() as wd:
             write_lines(txt, wd)

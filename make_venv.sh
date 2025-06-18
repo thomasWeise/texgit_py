@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Make the latexgit package virtual environment.
+# Make the texgit package virtual environment.
 
 # strict error handling
 set -o pipefail  # trace ERR through pipes

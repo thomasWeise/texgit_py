@@ -6,8 +6,8 @@ from pycommons.io.path import Path, file_path
 from pycommons.processes.python import PYTHON_ENV, python_command
 from pycommons.processes.shell import STREAM_CAPTURE, Command
 
-import latexgit.formatters.python as fp
-from latexgit.formatters.python import preprocess_python
+import texgit.formatters.python as fp
+from texgit.formatters.python import preprocess_python
 
 
 def test_python_1() -> None:

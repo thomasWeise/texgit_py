@@ -18,7 +18,8 @@ REQUEST_GIT_FILE: Final[str] = r"\@texgit@gitFile"
 REQUEST_ARG_FILE: Final[str] = r"\@texgit@argFile"
 #: the header for process result requests
 REQUEST_PROCESS: Final[str] = r"\@texgit@process"
-
+#: the forbidden line marker that needs to be purged
+FORBIDDEN_LINE: Final[str] = r"\@texgit@needsTexgitPass"
 
 #: the replacements
 __REPL: Final[dict[str, str]] = {
@@ -222,7 +223,9 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     if getsize(aux_file) <= 0:
         logger(f"aux file {aux_file!r} is empty. Nothing to do. Exiting.")
         return
-    lines: Final[list[str]] = list(map(str.rstrip, aux_file.open_for_read()))
+    lines: Final[list[str]] = list(filter(
+        lambda lstr: FORBIDDEN_LINE not in lstr,
+        aux_file.open_for_read()))
     lenlines: Final[int] = len(lines)
     if lenlines <= 0:
         logger(f"aux file {aux_file!r} contains no lines. "
@@ -235,10 +238,11 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
 
     pm: ProcessManager | None = None
     append: list[str] = []
+    stripped_lines: list[str] = list(map(str.strip, lines))
 
     try:
         resolved: int = 0
-        for line in lines:
+        for line in stripped_lines:
             request: list[str | None] | None = __get_request(line)
             if request is None:
                 continue
@@ -268,11 +272,11 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
         return
 
     logger(f"Found and resolved {resolved} file requests.")
-    for app in append:  # make the texgit invocation idempotent
-        if app and (app not in lines):
+    for app in map(str.strip, append):  # make the texgit invocation idempotent
+        if app and (app not in stripped_lines):
             lines.append(app)
     with aux_file.open_for_write() as wd:
-        write_lines(map(str.rstrip, lines), wd)
+        write_lines(lines, wd)
     logger(f"Finished flushing {len(lines)} lines to aux file {aux_file!r}.")
 
 

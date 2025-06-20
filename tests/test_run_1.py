@@ -22,6 +22,7 @@ def test_aux() -> None:
           temp_file(td, suffix=".aux") as tf):
         txt = [
             r"\relax",
+            r"\@texgit@needsTexgitPass",
             f"{REQUEST_GIT_FILE}{{a}}{{{mrepo}}}{{README.md}}{{head -n 5}}",
             f"{REQUEST_GIT_FILE}{{b}}{{{mrepo}}}{{LICENSE}}{{}}",
             f"{REQUEST_GIT_FILE}{{c}}{{{mrepo}}}{{make.sh}}{{sort}}",
@@ -34,7 +35,7 @@ def test_aux() -> None:
         run(tf)
         got_1 = list(tf.open_for_read())
 
-        assert len(got_1) == (len(txt) + 8)
+        assert len(got_1) == (len(txt) + 7)
         assert len([s for s in got_1 if RESPONSE_PATH in s]) == 5
         assert len([s for s in got_1 if RESPONSE_URL in s]) == 3
 

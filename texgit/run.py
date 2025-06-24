@@ -223,9 +223,7 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     if getsize(aux_file) <= 0:
         logger(f"aux file {aux_file!r} is empty. Nothing to do. Exiting.")
         return
-    lines: Final[list[str]] = list(filter(
-        lambda lstr: FORBIDDEN_LINE not in lstr,
-        aux_file.open_for_read()))
+    lines: Final[list[str]] = list(aux_file.open_for_read())
     lenlines: Final[int] = len(lines)
     if lenlines <= 0:
         logger(f"aux file {aux_file!r} contains no lines. "
@@ -239,10 +237,15 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
     pm: ProcessManager | None = None
     append: list[str] = []
     stripped_lines: list[str] = list(map(str.strip, lines))
+    deleted: int = 0  # the number of lines deleted
 
     try:
         resolved: int = 0
-        for line in stripped_lines:
+        for idx, line in enumerate(stripped_lines):
+            if line.startswith(FORBIDDEN_LINE):
+                del lines[idx - deleted]
+                deleted += 1
+
             request: list[str | None] | None = __get_request(line)
             if request is None:
                 continue
@@ -267,8 +270,8 @@ def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:
             pm.close()
             del pm
 
-    if len(append) <= 0:
-        logger("No file requests found. Nothing to do.")
+    if (len(append) <= 0) and (deleted <= 0):
+        logger("No file requests or deletion markers found. Nothing to do.")
         return
 
     logger(f"Found and resolved {resolved} file requests.")

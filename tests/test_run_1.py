@@ -15,7 +15,7 @@ from texgit.run import (
 )
 
 
-def test_aux() -> None:
+def test_aux_1() -> None:
     """Test the aux processor."""
     mrepo: Final[str] = "https://github.com/thomasWeise/moptipy"
     with (temp_dir() as td,
@@ -38,6 +38,30 @@ def test_aux() -> None:
         assert len(got_1) == (len(txt) + 7)
         assert len([s for s in got_1 if RESPONSE_PATH in s]) == 5
         assert len([s for s in got_1 if RESPONSE_URL in s]) == 3
+
+        with tf.open_for_write() as wd:
+            write_lines(txt, wd)
+        run(tf)
+        got_2 = list(tf.open_for_read())
+
+        assert got_1 == got_2
+
+
+def test_aux_2() -> None:
+    """Test the aux processor."""
+    with (temp_dir() as td,
+          temp_file(td, suffix=".aux") as tf):
+        txt = [
+            r"\relax",
+            r"\@texgit@needsTexgitPass",
+            r"\gdef \@abspage@last{1}"]
+        with tf.open_for_write() as wd:
+            write_lines(txt, wd)
+
+        run(tf)
+        got_1 = list(tf.open_for_read())
+
+        assert len(got_1) == (len(txt) - 1)
 
         with tf.open_for_write() as wd:
             write_lines(txt, wd)

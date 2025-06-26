@@ -222,4 +222,4 @@ class ProcessManager(GitManager):
                                stdin=gf.path.read_all_str())
         else:
             path = gf.path
-        return GitPath(path, gf.repo, gf.repo.make_url(gf.path))
+        return GitPath(path, gf.repo, gf.repo.make_url(gf.path), gf.basename)

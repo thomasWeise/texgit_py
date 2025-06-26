@@ -48,13 +48,17 @@ from tempfile import mkstemp
 from typing import Callable, Final
 
 from pycommons.io.path import Path
-from pycommons.strings.enforce import enforce_non_empty_str_without_ws
+
+__OK_CHARS: Final[str] = ("abcdefghijklmnopqrstuvwxyz"
+                          "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                          "0123456789+-_")
 
 #: the characters that are OK for a file name
-_FILENAME_OK: Callable[[str], bool] = set(
-    "abcdefghijklmnopqrstuvwxyz"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "0123456789+-_").__contains__
+_FILENAME_OK: Callable[[str], bool] = set(__OK_CHARS).__contains__
+
+#: characters forbidden in a key
+__KEY_ALLOWED: Callable[[str], bool] = (
+    set(__OK_CHARS).union(":.").__contains__)
 
 
 def _make_key(s: str) -> str:
@@ -64,7 +68,13 @@ def _make_key(s: str) -> str:
     :param s: the string
     :return: the key
     """
-    return enforce_non_empty_str_without_ws(str.strip(s))
+    s = str.strip(s)
+    if str.__len__(s) <= 0:
+        raise ValueError("Non-empty str expected, but got empty string "
+                         "or string of only white space.")
+    if not all(map(__KEY_ALLOWED, s)):
+        raise ValueError("String contains forbidden character.")
+    return s
 
 
 def _make_ignore(path: Path) -> None:

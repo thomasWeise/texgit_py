@@ -9,6 +9,8 @@ from texgit.run import (
     REQUEST_ARG_FILE,
     REQUEST_GIT_FILE,
     REQUEST_PROCESS,
+    RESPONSE_ESCAPED_NAME,
+    RESPONSE_NAME,
     RESPONSE_PATH,
     RESPONSE_URL,
     run,
@@ -35,8 +37,10 @@ def test_aux_1() -> None:
         run(tf)
         got_1 = list(tf.open_for_read())
 
-        assert len(got_1) == (len(txt) + 7)
+        assert len(got_1) == (len(txt) + 15)
         assert len([s for s in got_1 if RESPONSE_PATH in s]) == 5
+        assert len([s for s in got_1 if RESPONSE_NAME in s]) == 4
+        assert len([s for s in got_1 if RESPONSE_ESCAPED_NAME in s]) == 4
         assert len([s for s in got_1 if RESPONSE_URL in s]) == 3
 
         with tf.open_for_write() as wd:

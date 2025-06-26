@@ -62,7 +62,7 @@ def test_process_arg_file() -> None:
         assert ap5.is_file()
         assert ap5.basename().endswith(".pdf")
 
-        ap6, x = fm.get_argument_file("1/2", "sdf@@x3")
+        ap6, x = fm.get_argument_file("12", "sdfx3")
         assert isinstance(ap6, Path)
         assert ap6.is_file()
 

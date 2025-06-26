@@ -7,6 +7,8 @@ from pycommons.io.temp import temp_dir, temp_file
 
 from texgit.run import (
     REQUEST_GIT_FILE,
+    RESPONSE_ESCAPED_NAME,
+    RESPONSE_NAME,
     RESPONSE_PATH,
     run,
 )
@@ -30,7 +32,8 @@ def test_aux() -> None:
         run(tf)
         got_1 = list(tf.open_for_read())
 
-        assert len(got_1) == (len(txt) + 2)
+        assert len(got_1) == (len(txt) + 4)
+
         res_files: list[str] = [s for s in got_1 if RESPONSE_PATH in s]
         assert len(res_files) == 1
         res_file: str = res_files[0]
@@ -38,6 +41,20 @@ def test_aux() -> None:
         i1: int = res_file.index(find) + len(find)
         res_path: Path = td.resolve_inside(
             res_file[i1:res_file.index("}", i1)])
+
+        res_files = [s for s in got_1 if RESPONSE_NAME in s]
+        assert len(res_files) == 1
+        res_file = res_files[0]
+        i1 = res_file.index(find) + len(find)
+        res_file = res_file[i1:res_file.index("}", i1)]
+        assert res_file == "def_factorial.py"
+
+        res_files = [s for s in got_1 if RESPONSE_ESCAPED_NAME in s]
+        assert len(res_files) == 1
+        res_file = res_files[0]
+        i1 = res_file.index(find) + len(find)
+        res_file = res_file[i1:res_file.index("}", i1)]
+        assert res_file == "def\\_factorial.py"
 
         processed_file = res_path.read_all_str()
         assert "\n\n\n" in processed_file

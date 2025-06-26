@@ -25,12 +25,15 @@ class GitPath:
     #: the absolute path of the file or directory inside the repository
     #: directory
     path: Path
+    #: the base name of the file
+    basename: str
     #: the repository
     repo: GitRepository
     #: the URL
     url: URL
 
-    def __init__(self, path: Path, repo: GitRepository, url: URL):
+    def __init__(self, path: Path, repo: GitRepository, url: URL,
+                 basename: str | None = None):
         """
         Set up the information about a repository.
 
@@ -43,9 +46,12 @@ class GitPath:
             raise type_error(repo, "repo", GitRepository)
         if not isinstance(url, URL):
             raise type_error(url, "url", URL)
+        basename = path.basename() if basename is None \
+            else str.strip(basename)
         object.__setattr__(self, "path", path)
         object.__setattr__(self, "repo", repo)
         object.__setattr__(self, "url", url)
+        object.__setattr__(self, "basename", basename)
 
 
 def _make_key(u: URL) -> tuple[str, str]:

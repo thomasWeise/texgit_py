@@ -2,4 +2,4 @@
 from typing import Final
 
 #: the version string of `texgit`
-__version__: Final[str] = "0.9.6"
+__version__: Final[str] = "0.9.7"

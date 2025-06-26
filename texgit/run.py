@@ -113,6 +113,10 @@ def __get_request(line: str) -> list[str | None] | None:
 
 #: the response header for the path
 RESPONSE_PATH: Final[str] = "@texgit@path@"
+#: the response header for the file name
+RESPONSE_NAME: Final[str] = "@texgit@name@"
+#: the response header for the escaped file name
+RESPONSE_ESCAPED_NAME: Final[str] = "@texgit@escName@"
 #: the response header for the url
 RESPONSE_URL: Final[str] = "@texgit@url@"
 
@@ -140,6 +144,40 @@ def __make_response(prefix: str, name: str, value: str) -> str:
             f"{value}{str.strip(__CMD_2)}")
 
 
+def __make_path_response(name: str, path: Path, base_dir: Path,
+                         basename: str | None = None)\
+        -> Generator[str, None, None]:
+    r"""
+    Make the path response commands.
+
+    :param name: the name prefix
+    :param path: the file path
+    :param basename: the basename
+    :param base_dir: the base directory
+
+    >>> from pycommons.io.temp import temp_dir
+    >>> with temp_dir() as td:
+    ...     list(__make_path_response("x", td.resolve_inside("yy"), td, None))
+    ['\\expandafter\\xdef\\csname @texgit@path@x\\endcsname{yy}%']
+    >>> with temp_dir() as td:
+    ...     v = list(__make_path_response("x", td.resolve_inside("yy"), td,
+    ...             "bla y_x"))
+    >>> v[0]
+    '\\expandafter\\xdef\\csname @texgit@path@x\\endcsname{yy}%'
+    >>> v[1]
+    '\\expandafter\\xdef\\csname @texgit@name@x\\endcsname{bla y_x}%'
+    >>> v[2]
+    '\\expandafter\\xdef\\csname @texgit@escName@x\\endcsname{bla~y\\_x}%'
+    """
+    yield __make_response(RESPONSE_PATH, name, path.relative_to(base_dir))
+    if basename is not None:
+        yield __make_response(RESPONSE_NAME, name, basename)
+        yield __make_response(
+            RESPONSE_ESCAPED_NAME, name,
+            basename.replace("$", "\\$").replace("_", "\\_").replace(
+                " ", "~"))
+
+
 def cmd_git_file(base_dir: Path, pm: ProcessManager,
                  command: list[str | None]) -> Generator[str, None, None]:
     """
@@ -159,8 +197,8 @@ def cmd_git_file(base_dir: Path, pm: ProcessManager,
         cmd = None
     gp: Final[GitPath] = pm.get_git_file(
         repo_url, relative_file, name, cmd)
-    yield __make_response(
-        RESPONSE_PATH, name, gp.path.relative_to(base_dir))
+    yield from __make_path_response(
+        name, gp.path, base_dir, gp.basename)
     if gp.url:
         yield __make_response(RESPONSE_URL, name, gp.url)
 
@@ -178,9 +216,8 @@ def cmd_arg_file(base_dir: Path, pm: ProcessManager,
     name: Final[str] = str.strip(command[1])
     prefix: Final[str | None] = command[2]
     suffix: Final[str | None] = command[3]
-    yield __make_response(
-        RESPONSE_PATH, name, pm.get_argument_file(
-            name, prefix, suffix)[0].relative_to(base_dir))
+    af: Final[Path] = pm.get_argument_file(name, prefix, suffix)[0]
+    yield from __make_path_response(name, af, base_dir, af.basename())
 
 
 def cmd_exec(base_dir: Path, pm: ProcessManager,
@@ -197,9 +234,8 @@ def cmd_exec(base_dir: Path, pm: ProcessManager,
     repo_url: Final[str | None] = command[2]
     relative_dir: Final[str | None] = command[3]
     cmd: list[str] = command[4:]
-    yield __make_response(
-        RESPONSE_PATH, name, pm.get_output(
-            name, cmd, repo_url, relative_dir).relative_to(base_dir))
+    yield from __make_path_response(
+        name, pm.get_output(name, cmd, repo_url, relative_dir), base_dir)
 
 
 def run(aux_arg: str, repo_dir_arg: str = "__git__") -> None:

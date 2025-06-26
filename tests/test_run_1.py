@@ -73,3 +73,29 @@ def test_aux_2() -> None:
         got_2 = list(tf.open_for_read())
 
         assert got_1 == got_2
+
+
+def test_aux_3() -> None:
+    """Test the aux processor."""
+    with (temp_dir() as td,
+          temp_file(td, suffix=".aux") as tf):
+        txt = [
+            r"\relax",
+            r"\@texgit@gitFile {R1}{https://github.com/"
+            r"thomasWeise/texgit_tex}{examples/dummy.tex}{}",
+            r"\@texgit@needsTexgitPass",
+            r"\gdef \@abspage@last{1}"]
+        with tf.open_for_write() as wd:
+            write_lines(txt, wd)
+
+        run(tf)
+        got_1 = list(tf.open_for_read())
+
+        assert len(got_1) == (len(txt) + 3)
+
+        with tf.open_for_write() as wd:
+            write_lines(txt, wd)
+        run(tf)
+        got_2 = list(tf.open_for_read())
+
+        assert got_1 == got_2

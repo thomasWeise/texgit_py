@@ -120,28 +120,36 @@ RESPONSE_ESCAPED_NAME: Final[str] = "@texgit@escName@"
 #: the response header for the url
 RESPONSE_URL: Final[str] = "@texgit@url@"
 
-#: the command start
-__CMD_0: Final[str] = r"\expandafter\xdef\csname "
+#: the command start A
+__CMD_0A: Final[str] = r"\expandafter\xdef\csname "
+#: the command start B
+__CMD_0B: Final[str] = r"\expandafter\gdef\csname "
 #: the command middle
 __CMD_1: Final[str] = r"\endcsname{"
 #: the command end
 __CMD_2: Final[str] = r"}%"
 
 
-def __make_response(prefix: str, name: str, value: str) -> str:
+def __make_response(prefix: str, name: str, value: str,
+                    xdef: bool = True) -> str:
     """
     Make a response command.
 
     :param prefix: the prefix
     :param value: the value
+    :param xdef: do we do xdef?
     :return: the result
 
     >>> print(__make_response(RESPONSE_PATH,
     ...       "lst:test", "./git/12.txt").replace(chr(92), "x"))
     xexpandafterxxdefxcsname @texgit@path@lst:testxendcsname{./git/12.txt}%
+
+    >>> print(__make_response(RESPONSE_PATH,
+    ...       "lst:test", "./git/12.txt", False).replace(chr(92), "x"))
+    xexpandafterxgdefxcsname @texgit@path@lst:testxendcsname{./git/12.txt}%
     """
-    return (f"{__CMD_0}{str.strip(prefix)}{str.strip(name)}{__CMD_1}"
-            f"{value}{str.strip(__CMD_2)}")
+    return (f"{__CMD_0A if xdef else __CMD_0B}{str.strip(prefix)}"
+            f"{str.strip(name)}{__CMD_1}{value}{str.strip(__CMD_2)}")
 
 
 def __make_path_response(name: str, path: Path, base_dir: Path,
@@ -167,7 +175,7 @@ def __make_path_response(name: str, path: Path, base_dir: Path,
     >>> v[1]
     '\\expandafter\\xdef\\csname @texgit@name@x\\endcsname{bla y_x}%'
     >>> v[2]
-    '\\expandafter\\xdef\\csname @texgit@escName@x\\endcsname{bla~y\\_x}%'
+    '\\expandafter\\gdef\\csname @texgit@escName@x\\endcsname{bla~y\\_x}%'
     """
     yield __make_response(RESPONSE_PATH, name, path.relative_to(base_dir))
     if basename is not None:
@@ -175,7 +183,7 @@ def __make_path_response(name: str, path: Path, base_dir: Path,
         yield __make_response(
             RESPONSE_ESCAPED_NAME, name,
             basename.replace("$", "\\$").replace("_", "\\_").replace(
-                " ", "~"))
+                " ", "~"), False)  # this one must be gdef!
 
 
 def cmd_git_file(base_dir: Path, pm: ProcessManager,

@@ -58,7 +58,7 @@ _FILENAME_OK: Callable[[str], bool] = set(__OK_CHARS).__contains__
 
 #: characters forbidden in a key
 __KEY_ALLOWED: Callable[[str], bool] = (
-    set(__OK_CHARS).union(":.").__contains__)
+    set(__OK_CHARS).union(":.@").__contains__)
 
 
 def _make_key(s: str) -> str:

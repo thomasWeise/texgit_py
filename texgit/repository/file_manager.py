@@ -56,9 +56,9 @@ __OK_CHARS: Final[str] = ("abcdefghijklmnopqrstuvwxyz"
 #: the characters that are OK for a file name
 _FILENAME_OK: Callable[[str], bool] = set(__OK_CHARS).__contains__
 
-#: characters forbidden in a key
+#: characters allowed in a key
 __KEY_ALLOWED: Callable[[str], bool] = (
-    set(__OK_CHARS).union(":.@").__contains__)
+    set(__OK_CHARS).union(":.@/").__contains__)
 
 
 def _make_key(s: str) -> str:

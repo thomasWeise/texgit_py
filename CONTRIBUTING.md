@@ -36,7 +36,7 @@ Dr. Thomas Weise holds the copyright of this package.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in `texgit` by you shall be under the above license, terms, and conditions, without any additional terms or conditions.
 Unless explicitly stating otherwise, contributors accept that their contributions will be licensed under the project terms.
-This also means that they grant Dr. Thomas Weise non-exclusive copyright of their contributions.
+This also means that they grant Dr. [Thomas Weise](https://thomasweise.github.io) non-exclusive copyright of their contributions.
 
 
 ## 3. Contact

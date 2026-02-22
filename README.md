@@ -59,9 +59,9 @@ The additional dependencies for a [full `make` build](https://thomasweise.github
 
 [`texgit`](https://thomasweise.github.io/texgit_py) is a tool for accessing files in `git` repositories from `LaTeX`.
 
-Copyright (C) 2023-&mdash;2025 Thomas Weise (汤卫思教授)
+Copyright (C) 2023-&mdash;2026 [Thomas Weise](https://thomasweise.github.io) (汤卫思教授)
 
-Dr. Thomas Weise (see [Contact](#4-contact)) holds the copyright of this package.
+Dr.&nbsp;[Thomas Weise](https://thomasweise.github.io) (see [Contact](#4-contact)) holds the copyright of this package.
 
 `texgit` is provided to the public as open source software under the [GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007](https://thomasweise.github.io/texgit_py/LICENSE.html).
 Terms for other licenses, e.g., for specific industrial applications, can be negotiated with Dr. Thomas Weise (who can be reached via the [contact information](#4-contact) below).

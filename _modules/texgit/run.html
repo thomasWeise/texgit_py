@@ -1,0 +1,363 @@
+<!doctype html><html data-content_root=../../ lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1.0"name=viewport><title>texgit.run — texgit 0.9.11 documentation</title><link href="../../_static/pygments.css?v=b86133f3"rel=stylesheet><link href="../../_static/bizstyle.css?v=5283bb3d"rel=stylesheet><script src="../../_static/documentation_options.js?v=88b3baf9"></script><script src="../../_static/doctools.js?v=9bcbadda"></script><script src="../../_static/sphinx_highlight.js?v=dc90522c"></script><script src=../../_static/bizstyle.js></script><link href=https://thomasweise.github.io/texgit_py/_modules/texgit/run.html rel=canonical><link href=../../genindex.html rel=index title=Index><link href=../../search.html rel=search title=Search><meta content="width=device-width,initial-scale=1.0"name=viewport><body><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"accesskey=I href=../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a accesskey=U href=../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.run</a></ul></div><div class=document><div class=documentwrapper><div class=bodywrapper><div class=body role=main><h1>Source code for texgit.run</h1><div class=highlight><pre>
+<span></span><span class=sd>"""Process a LaTeX aux file."""</span>
+<span class=kn>import</span><span class=w> </span><span class=nn>argparse</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>os.path</span><span class=w> </span><span class=kn>import</span> <span class=n>dirname</span><span class=p>,</span> <span class=n>getsize</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>typing</span><span class=w> </span><span class=kn>import</span> <span class=n>Final</span><span class=p>,</span> <span class=n>Generator</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.arguments</span><span class=w> </span><span class=kn>import</span> <span class=n>make_argparser</span><span class=p>,</span> <span class=n>make_epilog</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.console</span><span class=w> </span><span class=kn>import</span> <span class=n>logger</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.path</span><span class=w> </span><span class=kn>import</span> <span class=n>Path</span><span class=p>,</span> <span class=n>directory_path</span><span class=p>,</span> <span class=n>write_lines</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.strings.string_tools</span><span class=w> </span><span class=kn>import</span> <span class=n>escape</span><span class=p>,</span> <span class=n>unescape</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>texgit.repository.git_manager</span><span class=w> </span><span class=kn>import</span> <span class=n>GitPath</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>texgit.repository.process_manager</span><span class=w> </span><span class=kn>import</span> <span class=n>ProcessManager</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>texgit.version</span><span class=w> </span><span class=kn>import</span> <span class=n>__version__</span>
+
+<span class=c1>#: the header for git file requests</span>
+<span class=n>REQUEST_GIT_FILE</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"\@texgit@gitFile"</span>
+<span class=c1>#: the header for argument file requests</span>
+<span class=n>REQUEST_ARG_FILE</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"\@texgit@argFile"</span>
+<span class=c1>#: the header for process result requests</span>
+<span class=n>REQUEST_PROCESS</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"\@texgit@process"</span>
+<span class=c1>#: the forbidden line marker that needs to be purged</span>
+<span class=n>FORBIDDEN_LINE</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"\@texgit@needsTexgitPass"</span>
+
+<span class=c1>#: the replacements</span>
+<span class=n>__REPL</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>]]</span> <span class=o>=</span> <span class=p>{</span>
+    <span class=sa>r</span><span class=s2>"</span><span class=se>\\</span><span class=s2>"</span><span class=p>:</span> <span class=s2>"</span><span class=se>\\</span><span class=s2>"</span><span class=p>,</span> <span class=sa>r</span><span class=s2>"\{"</span><span class=p>:</span> <span class=s2>"{"</span><span class=p>,</span> <span class=s2>"{{"</span><span class=p>:</span> <span class=s2>"{"</span><span class=p>,</span> <span class=sa>r</span><span class=s2>"\}"</span><span class=p>:</span> <span class=s2>"}"</span><span class=p>,</span> <span class=s2>"}}"</span><span class=p>:</span> <span class=s2>"}"</span><span class=p>,</span> <span class=sa>r</span><span class=s2>"\ "</span><span class=p>:</span> <span class=s2>" "</span><span class=p>,</span>
+<span class=p>}</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>__get_request</span><span class=p>(</span><span class=n>line</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>    </span><span class=sa>r</span><span class=sd>"""</span>
+<span class=sd>    Get the repository request, if any.</span>
+
+<span class=sd>    :param line: the line</span>
+<span class=sd>    :return: the request, composed of the request function, the repository</span>
+<span class=sd>        (if any), the path (if any), and the optional command; or `None` if</span>
+<span class=sd>        no request was found.</span>
+
+<span class=sd>    >>> print(__get_request(""))</span>
+<span class=sd>    None</span>
+<span class=sd>    >>> print(__get_request(r"\hello"))</span>
+<span class=sd>    None</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x', 'y', None]</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@process{x}{y}{python3 --version}"))</span>
+<span class=sd>    ['\\@texgit@process', 'x', 'y', 'python3', '--version']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{a}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x', 'y', 'a']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{a b}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x', 'y', 'a', 'b']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x}{y}{a\ b}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x', 'y', 'a b']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x{{y}{y}{a\ b}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x{y', 'y', 'a b']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x\{y}{y}{a\ b}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x{y', 'y', 'a b']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x\{y}{}}y}{a\ b}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x{y', '}y', 'a b']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile{x\{y}{}}y}{a\ \\b}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x{y', '}y', 'a \\b']</span>
+<span class=sd>    >>> print(__get_request(r"\@texgit@gitFile {x\{y}{}}y}{a\ \\b}"))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x{y', '}y', 'a \\b']</span>
+<span class=sd>    >>> print(__get_request(</span>
+<span class=sd>    ...     r" \@texgit@gitFile { x\{y}{ }}y }{ a\ \\b } "))</span>
+<span class=sd>    ['\\@texgit@gitFile', 'x{y', '}y', 'a \\b']</span>
+<span class=sd>    >>> print(__get_request(</span>
+<span class=sd>    ...     r" \@texgit@argFile { x\{y}{ }}y }{ a\ \\b }  {xx} {y   }"))</span>
+<span class=sd>    ['\\@texgit@argFile', 'x{y', '}y', 'a \\b', 'xx', 'y']</span>
+<span class=sd>    """</span>
+    <span class=n>use_line</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>line</span><span class=p>)</span>
+    <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>use_line</span><span class=p>)</span> <span class=o>>=</span> <span class=mi>67108864</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"line is </span><span class=si>{</span><span class=nb>len</span><span class=p>(</span><span class=n>use_line</span><span class=p>)</span><span class=si>}</span><span class=s2> characters long?"</span><span class=p>)</span>
+
+    <span class=n>request</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>=</span> <span class=n>REQUEST_GIT_FILE</span> <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span>
+        <span class=n>use_line</span><span class=p>,</span> <span class=n>REQUEST_GIT_FILE</span><span class=p>)</span> <span class=k>else</span> <span class=p>(</span><span class=n>REQUEST_ARG_FILE</span> <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span>
+            <span class=n>use_line</span><span class=p>,</span> <span class=n>REQUEST_ARG_FILE</span><span class=p>)</span> <span class=k>else</span> <span class=p>(</span>
+            <span class=n>REQUEST_PROCESS</span> <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=n>use_line</span><span class=p>,</span> <span class=n>REQUEST_PROCESS</span><span class=p>)</span>
+            <span class=k>else</span> <span class=kc>None</span><span class=p>))</span>
+    <span class=k>if</span> <span class=n>request</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=k>return</span> <span class=kc>None</span>
+    <span class=n>use_line</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>use_line</span><span class=p>[</span><span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>request</span><span class=p>):])</span>
+    <span class=k>if</span> <span class=p>(</span><span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>use_line</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>)</span> <span class=ow>or</span> <span class=p>(</span><span class=n>use_line</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span> <span class=o>!=</span> <span class=s2>"{"</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+            <span class=sa>f</span><span class=s2>"rest line=</span><span class=si>{</span><span class=n>use_line</span><span class=si>!r}</span><span class=s2> for </span><span class=si>{</span><span class=n>request</span><span class=si>!r}</span><span class=s2> in </span><span class=si>{</span><span class=n>line</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+
+    <span class=c1># find markers for search-replacing problematic chars</span>
+    <span class=n>use_line</span><span class=p>,</span> <span class=n>esc</span> <span class=o>=</span> <span class=n>escape</span><span class=p>(</span><span class=n>use_line</span><span class=p>,</span> <span class=n>__REPL</span><span class=o>.</span><span class=n>keys</span><span class=p>())</span>
+
+    <span class=c1># Now we collect all the arguments</span>
+    <span class=n>command</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>=</span> <span class=p>[</span><span class=n>request</span><span class=p>]</span>
+    <span class=n>idx_0</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>1</span>
+    <span class=k>while</span> <span class=kc>True</span><span class=p>:</span>
+        <span class=n>idx_1</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=n>use_line</span><span class=o>.</span><span class=n>find</span><span class=p>(</span><span class=s2>"}"</span><span class=p>,</span> <span class=n>idx_0</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>idx_1</span> <span class=o><</span> <span class=n>idx_0</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Found </span><span class=se>{{</span><span class=s2> but no </span><span class=se>}}</span><span class=s2> in </span><span class=si>{</span><span class=n>line</span><span class=si>!r}</span><span class=s2>?"</span><span class=p>)</span>
+        <span class=n>arg</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>use_line</span><span class=p>[</span><span class=n>idx_0</span><span class=p>:</span><span class=n>idx_1</span><span class=p>])</span>
+        <span class=k>if</span> <span class=n>arg</span><span class=p>:</span>
+            <span class=k>for</span> <span class=n>argi</span> <span class=ow>in</span> <span class=nb>str</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=n>arg</span><span class=p>):</span>
+                <span class=n>argj</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>argi</span><span class=p>)</span>
+                <span class=k>if</span> <span class=n>argj</span><span class=p>:</span>
+                    <span class=n>argj</span> <span class=o>=</span> <span class=n>unescape</span><span class=p>(</span><span class=n>argj</span><span class=p>,</span> <span class=n>esc</span><span class=p>)</span>
+                    <span class=k>for</span> <span class=n>k</span><span class=p>,</span> <span class=n>v</span> <span class=ow>in</span> <span class=n>__REPL</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
+                        <span class=n>argj</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>replace</span><span class=p>(</span><span class=n>argj</span><span class=p>,</span> <span class=n>k</span><span class=p>,</span> <span class=n>v</span><span class=p>)</span>
+                    <span class=n>command</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>argj</span><span class=p>)</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>command</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=kc>None</span><span class=p>)</span>
+        <span class=n>idx_0</span> <span class=o>=</span> <span class=n>use_line</span><span class=o>.</span><span class=n>find</span><span class=p>(</span><span class=s2>"{"</span><span class=p>,</span> <span class=n>idx_1</span> <span class=o>+</span> <span class=mi>1</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>idx_0</span> <span class=o><=</span> <span class=n>idx_1</span><span class=p>:</span>
+            <span class=k>break</span>
+        <span class=n>idx_0</span> <span class=o>+=</span> <span class=mi>1</span>
+    <span class=k>return</span> <span class=n>command</span>
+
+
+<span class=c1>#: the response header for the path</span>
+<span class=n>RESPONSE_PATH</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=s2>"@texgit@path@"</span>
+<span class=c1>#: the response header for the file name</span>
+<span class=n>RESPONSE_NAME</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=s2>"@texgit@name@"</span>
+<span class=c1>#: the response header for the escaped file name</span>
+<span class=n>RESPONSE_ESCAPED_NAME</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=s2>"@texgit@escName@"</span>
+<span class=c1>#: the response header for the url</span>
+<span class=n>RESPONSE_URL</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=s2>"@texgit@url@"</span>
+
+<span class=c1>#: the command start A</span>
+<span class=n>__CMD_0A</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"\expandafter\xdef\csname "</span>
+<span class=c1>#: the command start B</span>
+<span class=n>__CMD_0B</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"\expandafter\gdef\csname "</span>
+<span class=c1>#: the command middle</span>
+<span class=n>__CMD_1</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"\endcsname{"</span>
+<span class=c1>#: the command end</span>
+<span class=n>__CMD_2</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=sa>r</span><span class=s2>"}%"</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>__make_response</span><span class=p>(</span><span class=n>prefix</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>value</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span>
+                    <span class=n>xdef</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-></span> <span class=nb>str</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Make a response command.</span>
+
+<span class=sd>    :param prefix: the prefix</span>
+<span class=sd>    :param value: the value</span>
+<span class=sd>    :param xdef: do we do xdef?</span>
+<span class=sd>    :return: the result</span>
+
+<span class=sd>    >>> print(__make_response(RESPONSE_PATH,</span>
+<span class=sd>    ...       "lst:test", "./git/12.txt").replace(chr(92), "x"))</span>
+<span class=sd>    xexpandafterxxdefxcsname @texgit@path@lst:testxendcsname{./git/12.txt}%</span>
+
+<span class=sd>    >>> print(__make_response(RESPONSE_PATH,</span>
+<span class=sd>    ...       "lst:test", "./git/12.txt", False).replace(chr(92), "x"))</span>
+<span class=sd>    xexpandafterxgdefxcsname @texgit@path@lst:testxendcsname{./git/12.txt}%</span>
+<span class=sd>    """</span>
+    <span class=k>return</span> <span class=p>(</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>__CMD_0A</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=n>xdef</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=n>__CMD_0B</span><span class=si>}{</span><span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>prefix</span><span class=p>)</span><span class=si>}</span><span class=s2>"</span>
+            <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>name</span><span class=p>)</span><span class=si>}{</span><span class=n>__CMD_1</span><span class=si>}{</span><span class=n>value</span><span class=si>}{</span><span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>__CMD_2</span><span class=p>)</span><span class=si>}</span><span class=s2>"</span><span class=p>)</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>__make_path_response</span><span class=p>(</span><span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>path</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span> <span class=n>base_dir</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span>
+                         <span class=n>basename</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span>\
+        <span class=o>-></span> <span class=n>Generator</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>,</span> <span class=kc>None</span><span class=p>]:</span>
+<span class=w>    </span><span class=sa>r</span><span class=sd>"""</span>
+<span class=sd>    Make the path response commands.</span>
+
+<span class=sd>    :param name: the name prefix</span>
+<span class=sd>    :param path: the file path</span>
+<span class=sd>    :param basename: the basename</span>
+<span class=sd>    :param base_dir: the base directory</span>
+
+<span class=sd>    >>> from pycommons.io.temp import temp_dir</span>
+<span class=sd>    >>> with temp_dir() as td:</span>
+<span class=sd>    ...     list(__make_path_response("x", td.resolve_inside("yy"), td, None))</span>
+<span class=sd>    ['\\expandafter\\xdef\\csname @texgit@path@x\\endcsname{yy}%']</span>
+<span class=sd>    >>> with temp_dir() as td:</span>
+<span class=sd>    ...     v = list(__make_path_response("x", td.resolve_inside("yy"), td,</span>
+<span class=sd>    ...             "bla y_x"))</span>
+<span class=sd>    >>> v[0]</span>
+<span class=sd>    '\\expandafter\\xdef\\csname @texgit@path@x\\endcsname{yy}%'</span>
+<span class=sd>    >>> v[1]</span>
+<span class=sd>    '\\expandafter\\xdef\\csname @texgit@name@x\\endcsname{bla y_x}%'</span>
+<span class=sd>    >>> v[2]</span>
+<span class=sd>    '\\expandafter\\gdef\\csname @texgit@escName@x\\endcsname{bla~y\\_x}%'</span>
+<span class=sd>    """</span>
+    <span class=k>yield</span> <span class=n>__make_response</span><span class=p>(</span><span class=n>RESPONSE_PATH</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=n>path</span><span class=o>.</span><span class=n>relative_to</span><span class=p>(</span><span class=n>base_dir</span><span class=p>))</span>
+    <span class=k>if</span> <span class=n>basename</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=k>yield</span> <span class=n>__make_response</span><span class=p>(</span><span class=n>RESPONSE_NAME</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=n>basename</span><span class=p>)</span>
+        <span class=k>yield</span> <span class=n>__make_response</span><span class=p>(</span>
+            <span class=n>RESPONSE_ESCAPED_NAME</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span>
+            <span class=n>basename</span><span class=o>.</span><span class=n>replace</span><span class=p>(</span><span class=s2>"$"</span><span class=p>,</span> <span class=s2>"</span><span class=se>\\</span><span class=s2>$"</span><span class=p>)</span><span class=o>.</span><span class=n>replace</span><span class=p>(</span><span class=s2>"_"</span><span class=p>,</span> <span class=s2>"</span><span class=se>\\</span><span class=s2>_"</span><span class=p>)</span><span class=o>.</span><span class=n>replace</span><span class=p>(</span>
+                <span class=s2>" "</span><span class=p>,</span> <span class=s2>"~"</span><span class=p>),</span> <span class=kc>False</span><span class=p>)</span>  <span class=c1># this one must be gdef!</span>
+
+
+<div class=viewcode-block id=cmd_git_file>
+<a class=viewcode-back href=../../texgit.html#texgit.run.cmd_git_file>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>cmd_git_file</span><span class=p>(</span><span class=n>base_dir</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span> <span class=n>pm</span><span class=p>:</span> <span class=n>ProcessManager</span><span class=p>,</span>
+                 <span class=n>command</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>])</span> <span class=o>-></span> <span class=n>Generator</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>,</span> <span class=kc>None</span><span class=p>]:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Get a file from `git`, maybe post-processed.</span>
+
+<span class=sd>    :param base_dir: the base directory</span>
+<span class=sd>    :param pm: the process manager</span>
+<span class=sd>    :param command: the command</span>
+<span class=sd>    :return: the answer</span>
+<span class=sd>    """</span>
+    <span class=n>name</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>command</span><span class=p>[</span><span class=mi>1</span><span class=p>])</span>
+    <span class=n>repo_url</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>command</span><span class=p>[</span><span class=mi>2</span><span class=p>])</span>
+    <span class=n>relative_file</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>command</span><span class=p>[</span><span class=mi>3</span><span class=p>])</span>
+    <span class=n>cmd</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=n>command</span><span class=p>[</span><span class=mi>4</span><span class=p>:]</span>
+    <span class=n>ll</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>=</span> <span class=nb>list</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>cmd</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>ll</span> <span class=o>==</span> <span class=mi>0</span> <span class=ow>or</span> <span class=p>((</span><span class=n>ll</span> <span class=o>==</span> <span class=mi>1</span><span class=p>)</span> <span class=ow>and</span> <span class=p>(</span><span class=n>cmd</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>)):</span>
+        <span class=n>cmd</span> <span class=o>=</span> <span class=kc>None</span>
+    <span class=n>gp</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>GitPath</span><span class=p>]</span> <span class=o>=</span> <span class=n>pm</span><span class=o>.</span><span class=n>get_git_file</span><span class=p>(</span>
+        <span class=n>repo_url</span><span class=p>,</span> <span class=n>relative_file</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=n>cmd</span><span class=p>)</span>
+    <span class=k>yield from</span> <span class=n>__make_path_response</span><span class=p>(</span>
+        <span class=n>name</span><span class=p>,</span> <span class=n>gp</span><span class=o>.</span><span class=n>path</span><span class=p>,</span> <span class=n>base_dir</span><span class=p>,</span> <span class=n>gp</span><span class=o>.</span><span class=n>basename</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>gp</span><span class=o>.</span><span class=n>url</span><span class=p>:</span>
+        <span class=k>yield</span> <span class=n>__make_response</span><span class=p>(</span><span class=n>RESPONSE_URL</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=n>gp</span><span class=o>.</span><span class=n>url</span><span class=p>)</span></div>
+
+
+
+<div class=viewcode-block id=cmd_arg_file>
+<a class=viewcode-back href=../../texgit.html#texgit.run.cmd_arg_file>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>cmd_arg_file</span><span class=p>(</span><span class=n>base_dir</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span> <span class=n>pm</span><span class=p>:</span> <span class=n>ProcessManager</span><span class=p>,</span>
+                 <span class=n>command</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>])</span> <span class=o>-></span> <span class=n>Generator</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>,</span> <span class=kc>None</span><span class=p>]:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Get an argument file.</span>
+
+<span class=sd>    :param base_dir: the base directory</span>
+<span class=sd>    :param pm: the process manager</span>
+<span class=sd>    :param command: the command</span>
+<span class=sd>    :return: the answer</span>
+<span class=sd>    """</span>
+    <span class=n>name</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>command</span><span class=p>[</span><span class=mi>1</span><span class=p>])</span>
+    <span class=n>prefix</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>=</span> <span class=n>command</span><span class=p>[</span><span class=mi>2</span><span class=p>]</span>
+    <span class=n>suffix</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>=</span> <span class=n>command</span><span class=p>[</span><span class=mi>3</span><span class=p>]</span>
+    <span class=n>af</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>pm</span><span class=o>.</span><span class=n>get_argument_file</span><span class=p>(</span><span class=n>name</span><span class=p>,</span> <span class=n>prefix</span><span class=p>,</span> <span class=n>suffix</span><span class=p>)[</span><span class=mi>0</span><span class=p>]</span>
+    <span class=k>yield from</span> <span class=n>__make_path_response</span><span class=p>(</span><span class=n>name</span><span class=p>,</span> <span class=n>af</span><span class=p>,</span> <span class=n>base_dir</span><span class=p>,</span> <span class=n>af</span><span class=o>.</span><span class=n>basename</span><span class=p>())</span></div>
+
+
+
+<div class=viewcode-block id=cmd_exec>
+<a class=viewcode-back href=../../texgit.html#texgit.run.cmd_exec>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>cmd_exec</span><span class=p>(</span><span class=n>base_dir</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span> <span class=n>pm</span><span class=p>:</span> <span class=n>ProcessManager</span><span class=p>,</span>
+             <span class=n>command</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>])</span> <span class=o>-></span> <span class=n>Generator</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>,</span> <span class=kc>None</span><span class=p>]:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Execute a command and capture the output.</span>
+
+<span class=sd>    :param base_dir: the base directory</span>
+<span class=sd>    :param pm: the process manager</span>
+<span class=sd>    :param command: the command</span>
+<span class=sd>    :return: the answer</span>
+<span class=sd>    """</span>
+    <span class=n>name</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>command</span><span class=p>[</span><span class=mi>1</span><span class=p>])</span>
+    <span class=n>repo_url</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>=</span> <span class=n>command</span><span class=p>[</span><span class=mi>2</span><span class=p>]</span>
+    <span class=n>relative_dir</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>=</span> <span class=n>command</span><span class=p>[</span><span class=mi>3</span><span class=p>]</span>
+    <span class=n>cmd</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>command</span><span class=p>[</span><span class=mi>4</span><span class=p>:]</span>
+    <span class=k>yield from</span> <span class=n>__make_path_response</span><span class=p>(</span>
+        <span class=n>name</span><span class=p>,</span> <span class=n>pm</span><span class=o>.</span><span class=n>get_output</span><span class=p>(</span><span class=n>name</span><span class=p>,</span> <span class=n>cmd</span><span class=p>,</span> <span class=n>repo_url</span><span class=p>,</span> <span class=n>relative_dir</span><span class=p>),</span> <span class=n>base_dir</span><span class=p>)</span></div>
+
+
+
+<div class=viewcode-block id=run>
+<a class=viewcode-back href=../../texgit.html#texgit.run.run>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>run</span><span class=p>(</span><span class=n>aux_arg</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>repo_dir_arg</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>"__git__"</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Execute the `texgit` tool.</span>
+
+<span class=sd>    This tool loads an LaTeX `aux` file, processes all file loading requests,</span>
+<span class=sd>    and flushes the produced file paths back to the `aux` file.</span>
+
+<span class=sd>    :param aux_arg: the `aux` file argument</span>
+<span class=sd>    :param repo_dir_arg: the repository directory argument</span>
+<span class=sd>    """</span>
+    <span class=n>aux_file</span><span class=p>:</span> <span class=n>Path</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=n>aux_arg</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>aux_file</span><span class=o>.</span><span class=n>is_file</span><span class=p>():</span>
+        <span class=n>aux_file</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>aux_arg</span><span class=si>}</span><span class=s2>.aux"</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>aux_file</span><span class=o>.</span><span class=n>is_file</span><span class=p>():</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"aux argument </span><span class=si>{</span><span class=n>aux_arg</span><span class=si>!r}</span><span class=s2> does not identify a file "</span>
+                         <span class=sa>f</span><span class=s2>"and neither does </span><span class=si>{</span><span class=n>aux_file</span><span class=si>!r}</span><span class=s2>"</span><span class=p>)</span>
+    <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Using aux file </span><span class=si>{</span><span class=n>aux_file</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+
+    <span class=k>if</span> <span class=n>getsize</span><span class=p>(</span><span class=n>aux_file</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+        <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"aux file </span><span class=si>{</span><span class=n>aux_file</span><span class=si>!r}</span><span class=s2> is empty. Nothing to do. Exiting."</span><span class=p>)</span>
+        <span class=k>return</span>
+    <span class=n>lines</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]]</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>aux_file</span><span class=o>.</span><span class=n>open_for_read</span><span class=p>())</span>
+    <span class=n>lenlines</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>=</span> <span class=nb>len</span><span class=p>(</span><span class=n>lines</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>lenlines</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+        <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"aux file </span><span class=si>{</span><span class=n>aux_file</span><span class=si>!r}</span><span class=s2> contains no lines. "</span>
+               <span class=s2>"Nothing to do. Exiting."</span><span class=p>)</span>
+    <span class=k>else</span><span class=p>:</span>
+        <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Loaded </span><span class=si>{</span><span class=n>lenlines</span><span class=si>}</span><span class=s2> lines from aux file </span><span class=si>{</span><span class=n>aux_file</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+
+    <span class=n>base_dir</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>directory_path</span><span class=p>(</span><span class=n>dirname</span><span class=p>(</span><span class=n>aux_file</span><span class=p>))</span>
+    <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"The base directory is </span><span class=si>{</span><span class=n>base_dir</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+
+    <span class=n>pm</span><span class=p>:</span> <span class=n>ProcessManager</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+    <span class=n>append</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=p>[]</span>
+    <span class=n>stripped_lines</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>,</span> <span class=n>lines</span><span class=p>))</span>
+    <span class=n>deleted</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>0</span>  <span class=c1># the number of lines deleted</span>
+
+    <span class=k>try</span><span class=p>:</span>
+        <span class=n>resolved</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>0</span>
+        <span class=k>for</span> <span class=n>idx</span><span class=p>,</span> <span class=n>line</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=n>stripped_lines</span><span class=p>):</span>
+            <span class=k>if</span> <span class=n>line</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=n>FORBIDDEN_LINE</span><span class=p>):</span>
+                <span class=k>del</span> <span class=n>lines</span><span class=p>[</span><span class=n>idx</span> <span class=o>-</span> <span class=n>deleted</span><span class=p>]</span>
+                <span class=n>deleted</span> <span class=o>+=</span> <span class=mi>1</span>
+
+            <span class=n>request</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=n>__get_request</span><span class=p>(</span><span class=n>line</span><span class=p>)</span>
+            <span class=k>if</span> <span class=n>request</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+                <span class=k>continue</span>
+
+            <span class=k>if</span> <span class=n>pm</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+                <span class=n>git_dir</span><span class=p>:</span> <span class=n>Path</span> <span class=o>=</span> <span class=n>base_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=n>repo_dir_arg</span><span class=p>)</span>
+                <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"The repository directory is </span><span class=si>{</span><span class=n>git_dir</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+                <span class=n>pm</span> <span class=o>=</span> <span class=n>ProcessManager</span><span class=p>(</span><span class=n>git_dir</span><span class=p>)</span>
+
+            <span class=n>func</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>request</span><span class=p>[</span><span class=mi>0</span><span class=p>])</span>
+            <span class=k>if</span> <span class=n>func</span> <span class=o>==</span> <span class=n>REQUEST_GIT_FILE</span><span class=p>:</span>
+                <span class=n>append</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=n>cmd_git_file</span><span class=p>(</span><span class=n>base_dir</span><span class=p>,</span> <span class=n>pm</span><span class=p>,</span> <span class=n>request</span><span class=p>))</span>
+            <span class=k>elif</span> <span class=n>func</span> <span class=o>==</span> <span class=n>REQUEST_ARG_FILE</span><span class=p>:</span>
+                <span class=n>append</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=n>cmd_arg_file</span><span class=p>(</span><span class=n>base_dir</span><span class=p>,</span> <span class=n>pm</span><span class=p>,</span> <span class=n>request</span><span class=p>))</span>
+            <span class=k>elif</span> <span class=n>func</span> <span class=o>==</span> <span class=n>REQUEST_PROCESS</span><span class=p>:</span>
+                <span class=n>append</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=n>cmd_exec</span><span class=p>(</span><span class=n>base_dir</span><span class=p>,</span> <span class=n>pm</span><span class=p>,</span> <span class=n>request</span><span class=p>))</span>
+            <span class=k>else</span><span class=p>:</span>
+                <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Invalid command </span><span class=si>{</span><span class=n>func</span><span class=si>}</span><span class=s2> in line </span><span class=si>{</span><span class=n>line</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+            <span class=n>resolved</span> <span class=o>+=</span> <span class=mi>1</span>
+    <span class=k>finally</span><span class=p>:</span>
+        <span class=k>if</span> <span class=n>pm</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=n>pm</span><span class=o>.</span><span class=n>close</span><span class=p>()</span>
+            <span class=k>del</span> <span class=n>pm</span>
+
+    <span class=k>if</span> <span class=p>(</span><span class=nb>len</span><span class=p>(</span><span class=n>append</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>)</span> <span class=ow>and</span> <span class=p>(</span><span class=n>deleted</span> <span class=o><=</span> <span class=mi>0</span><span class=p>):</span>
+        <span class=n>logger</span><span class=p>(</span><span class=s2>"No file requests or deletion markers found. Nothing to do."</span><span class=p>)</span>
+        <span class=k>return</span>
+
+    <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Found and resolved </span><span class=si>{</span><span class=n>resolved</span><span class=si>}</span><span class=s2> file requests."</span><span class=p>)</span>
+    <span class=k>for</span> <span class=n>app</span> <span class=ow>in</span> <span class=nb>map</span><span class=p>(</span><span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>,</span> <span class=n>append</span><span class=p>):</span>  <span class=c1># make the texgit invocation idempotent</span>
+        <span class=k>if</span> <span class=n>app</span> <span class=ow>and</span> <span class=p>(</span><span class=n>app</span> <span class=ow>not</span> <span class=ow>in</span> <span class=n>stripped_lines</span><span class=p>):</span>
+            <span class=n>lines</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>app</span><span class=p>)</span>
+    <span class=k>with</span> <span class=n>aux_file</span><span class=o>.</span><span class=n>open_for_write</span><span class=p>()</span> <span class=k>as</span> <span class=n>wd</span><span class=p>:</span>
+        <span class=n>write_lines</span><span class=p>(</span><span class=n>lines</span><span class=p>,</span> <span class=n>wd</span><span class=p>)</span>
+    <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Finished flushing </span><span class=si>{</span><span class=nb>len</span><span class=p>(</span><span class=n>lines</span><span class=p>)</span><span class=si>}</span><span class=s2> lines to aux file </span><span class=si>{</span><span class=n>aux_file</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span></div>
+
+
+
+<span class=c1># Execute the texgit tool</span>
+<span class=k>if</span> <span class=vm>__name__</span> <span class=o>==</span> <span class=s2>"__main__"</span><span class=p>:</span>
+    <span class=n>parser</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>argparse</span><span class=o>.</span><span class=n>ArgumentParser</span><span class=p>]</span> <span class=o>=</span> <span class=n>make_argparser</span><span class=p>(</span>
+        <span class=vm>__file__</span><span class=p>,</span> <span class=s2>"Execute the texgit Tool."</span><span class=p>,</span>
+        <span class=n>make_epilog</span><span class=p>(</span>
+            <span class=s2>"Download and provide local paths for "</span>
+            <span class=s2>"files from git repositories and execute programs."</span><span class=p>,</span>
+            <span class=mi>2023</span><span class=p>,</span> <span class=mi>2025</span><span class=p>,</span> <span class=s2>"Thomas Weise"</span><span class=p>,</span>
+            <span class=n>url</span><span class=o>=</span><span class=s2>"https://thomasweise.github.io/texgit_py"</span><span class=p>,</span>
+            <span class=n>email</span><span class=o>=</span><span class=s2>"tweise@hfuu.edu.cn, tweise@ustc.edu.cn"</span><span class=p>),</span>
+        <span class=n>__version__</span><span class=p>)</span>
+    <span class=n>parser</span><span class=o>.</span><span class=n>add_argument</span><span class=p>(</span>
+        <span class=s2>"aux"</span><span class=p>,</span> <span class=n>help</span><span class=o>=</span><span class=s2>"the aux file to process"</span><span class=p>,</span> <span class=nb>type</span><span class=o>=</span><span class=nb>str</span><span class=p>,</span> <span class=n>default</span><span class=o>=</span><span class=s2>""</span><span class=p>)</span>
+    <span class=n>parser</span><span class=o>.</span><span class=n>add_argument</span><span class=p>(</span>
+        <span class=s2>"--repoDir"</span><span class=p>,</span> <span class=n>help</span><span class=o>=</span><span class=s2>"the directory to use for caching output"</span><span class=p>,</span>
+        <span class=nb>type</span><span class=o>=</span><span class=nb>str</span><span class=p>,</span> <span class=n>default</span><span class=o>=</span><span class=s2>"__git__"</span><span class=p>,</span> <span class=n>nargs</span><span class=o>=</span><span class=s2>"?"</span><span class=p>)</span>
+    <span class=n>args</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>argparse</span><span class=o>.</span><span class=n>Namespace</span><span class=p>]</span> <span class=o>=</span> <span class=n>parser</span><span class=o>.</span><span class=n>parse_args</span><span class=p>()</span>
+
+    <span class=n>run</span><span class=p>(</span><span class=n>args</span><span class=o>.</span><span class=n>aux</span><span class=o>.</span><span class=n>strip</span><span class=p>(),</span> <span class=n>args</span><span class=o>.</span><span class=n>repoDir</span><span class=o>.</span><span class=n>strip</span><span class=p>())</span>
+    <span class=n>logger</span><span class=p>(</span><span class=s2>"All done."</span><span class=p>)</span>
+</pre></div><div class=clearer></div></div></div></div><div aria-label=Main class=sphinxsidebar role=navigation><div class=sphinxsidebarwrapper><search id=searchbox role=search style=display:none> <h3 id=searchlabel>Quick search</h3> <div class=searchformwrapper><form action=../../search.html class=search><input aria-labelledby=searchlabel autocapitalize=off autocomplete=off autocorrect=off name=q spellcheck=false><input type=submit value=Go></form></div> </search><script>document.getElementById(`searchbox`).style.display=`block`;</script></div></div><div class=clearer></div></div><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"href=../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a href=../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.run</a></ul></div><div class=footer role=contentinfo>© Copyright 2023-2026, Thomas Weise.</div>

@@ -1,0 +1,50 @@
+texgit.repository package
+=========================
+
+.. automodule:: texgit.repository
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+texgit.repository.file\_manager module
+--------------------------------------
+
+.. automodule:: texgit.repository.file_manager
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+texgit.repository.fix\_path module
+----------------------------------
+
+.. automodule:: texgit.repository.fix_path
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+texgit.repository.git module
+----------------------------
+
+.. automodule:: texgit.repository.git
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+texgit.repository.git\_manager module
+-------------------------------------
+
+.. automodule:: texgit.repository.git_manager
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+texgit.repository.process\_manager module
+-----------------------------------------
+
+.. automodule:: texgit.repository.process_manager
+   :members:
+   :show-inheritance:
+   :undoc-members:

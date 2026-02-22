@@ -1,0 +1,245 @@
+<!doctype html><html data-content_root=../../../ lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1.0"name=viewport><title>texgit.repository.git — texgit 0.9.11 documentation</title><link href="../../../_static/pygments.css?v=b86133f3"rel=stylesheet><link href="../../../_static/bizstyle.css?v=5283bb3d"rel=stylesheet><script src="../../../_static/documentation_options.js?v=88b3baf9"></script><script src="../../../_static/doctools.js?v=9bcbadda"></script><script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script><script src=../../../_static/bizstyle.js></script><link href=https://thomasweise.github.io/texgit_py/_modules/texgit/repository/git.html rel=canonical><link href=../../../genindex.html rel=index title=Index><link href=../../../search.html rel=search title=Search><meta content="width=device-width,initial-scale=1.0"name=viewport><body><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"accesskey=I href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a accesskey=U href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.git</a></ul></div><div class=document><div class=documentwrapper><div class=bodywrapper><div class=body role=main><h1>Source code for texgit.repository.git</h1><div class=highlight><pre>
+<span></span><span class=sd>"""Tools for interacting with repository."""</span>
+<span class=kn>import</span><span class=w> </span><span class=nn>datetime</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>dataclasses</span><span class=w> </span><span class=kn>import</span> <span class=n>dataclass</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>re</span><span class=w> </span><span class=kn>import</span> <span class=n>MULTILINE</span><span class=p>,</span> <span class=n>Pattern</span><span class=p>,</span> <span class=n>search</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>re</span><span class=w> </span><span class=kn>import</span> <span class=nb>compile</span> <span class=k>as</span> <span class=n>re_compile</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>shutil</span><span class=w> </span><span class=kn>import</span> <span class=n>rmtree</span><span class=p>,</span> <span class=n>which</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>typing</span><span class=w> </span><span class=kn>import</span> <span class=n>Final</span><span class=p>,</span> <span class=n>cast</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.console</span><span class=w> </span><span class=kn>import</span> <span class=n>logger</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.path</span><span class=w> </span><span class=kn>import</span> <span class=n>Path</span><span class=p>,</span> <span class=n>file_path</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.net.url</span><span class=w> </span><span class=kn>import</span> <span class=n>URL</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.processes.shell</span><span class=w> </span><span class=kn>import</span> <span class=n>STREAM_CAPTURE</span><span class=p>,</span> <span class=n>Command</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.strings.enforce</span><span class=w> </span><span class=kn>import</span> <span class=p>(</span>
+    <span class=n>enforce_non_empty_str</span><span class=p>,</span>
+    <span class=n>enforce_non_empty_str_without_ws</span><span class=p>,</span>
+<span class=p>)</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.strings.string_conv</span><span class=w> </span><span class=kn>import</span> <span class=n>datetime_to_datetime_str</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.types</span><span class=w> </span><span class=kn>import</span> <span class=n>type_error</span>
+
+
+<div class=viewcode-block id=git>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git.git>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>git</span><span class=p>()</span> <span class=o>-></span> <span class=n>Path</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Get the path to the git executable.</span>
+
+<span class=sd>    :return: the path to the git executable</span>
+<span class=sd>    """</span>
+    <span class=n>obj</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>object</span><span class=p>]</span> <span class=o>=</span> <span class=n>git</span>
+    <span class=n>attr</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=s2>"__the_path"</span>
+    <span class=k>if</span> <span class=nb>hasattr</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>attr</span><span class=p>):</span>
+        <span class=k>return</span> <span class=n>cast</span><span class=p>(</span><span class=s2>"Path"</span><span class=p>,</span> <span class=nb>getattr</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>attr</span><span class=p>))</span>
+
+    <span class=n>path</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=n>which</span><span class=p>(</span><span class=s2>"git"</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>path</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"Could not find 'repository' installation."</span><span class=p>)</span>
+    <span class=n>result</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>file_path</span><span class=p>(</span><span class=n>path</span><span class=p>)</span>
+    <span class=nb>setattr</span><span class=p>(</span><span class=n>obj</span><span class=p>,</span> <span class=n>attr</span><span class=p>,</span> <span class=n>result</span><span class=p>)</span>
+    <span class=k>return</span> <span class=n>result</span></div>
+
+
+
+<span class=c1>#: the commit pattern</span>
+<span class=n>_COMMIT</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Pattern</span><span class=p>]</span> <span class=o>=</span> <span class=n>re_compile</span><span class=p>(</span><span class=sa>r</span><span class=s2>"^\s*commit\s+(.+?)\s+"</span><span class=p>,</span> <span class=n>flags</span><span class=o>=</span><span class=n>MULTILINE</span><span class=p>)</span>
+<span class=c1>#: the date</span>
+<span class=n>_DATE</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Pattern</span><span class=p>]</span> <span class=o>=</span> <span class=n>re_compile</span><span class=p>(</span><span class=sa>r</span><span class=s2>"^\s*Date:\s+(.+?)$"</span><span class=p>,</span> <span class=n>flags</span><span class=o>=</span><span class=n>MULTILINE</span><span class=p>)</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>_get_base_url</span><span class=p>(</span><span class=n>url</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=n>URL</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Get the base url of a git repository.</span>
+
+<span class=sd>    :return: the base url of a git repository.</span>
+<span class=sd>    """</span>
+    <span class=n>base_url</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>URL</span><span class=p>(</span><span class=n>url</span><span class=p>)</span>
+    <span class=n>base_url_lower</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>base_url</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>base_url_lower</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=s2>"ssh://git@github."</span><span class=p>):</span>
+        <span class=n>base_url</span> <span class=o>=</span> <span class=sa>f</span><span class=s2>"https://</span><span class=si>{</span><span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>base_url</span><span class=p>[</span><span class=mi>10</span><span class=p>:])</span><span class=si>}</span><span class=s2>"</span>
+    <span class=k>if</span> <span class=n>base_url_lower</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=s2>".git"</span><span class=p>):</span>
+        <span class=n>base_url</span> <span class=o>=</span> <span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>base_url</span><span class=p>[:</span><span class=o>-</span><span class=mi>4</span><span class=p>])</span>
+    <span class=k>return</span> <span class=n>URL</span><span class=p>(</span><span class=n>base_url</span><span class=p>)</span>
+
+
+<div class=viewcode-block id=GitRepository>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git.GitRepository>[docs]</a>
+<span class=nd>@dataclass</span><span class=p>(</span><span class=n>frozen</span><span class=o>=</span><span class=kc>True</span><span class=p>,</span> <span class=n>init</span><span class=o>=</span><span class=kc>False</span><span class=p>,</span> <span class=n>order</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+<span class=k>class</span><span class=w> </span><span class=nc>GitRepository</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""An immutable record of a repository."""</span>
+
+    <span class=c1>#: the repository path</span>
+    <span class=n>path</span><span class=p>:</span> <span class=n>Path</span>
+    <span class=c1>#: the normalized repository url</span>
+    <span class=n>url</span><span class=p>:</span> <span class=n>URL</span>
+    <span class=c1>#: the commit</span>
+    <span class=n>commit</span><span class=p>:</span> <span class=nb>str</span>
+    <span class=c1>#: the date and time</span>
+    <span class=n>date_time</span><span class=p>:</span> <span class=nb>str</span>
+
+    <span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>path</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span> <span class=n>url</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>commit</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>date_time</span><span class=p>:</span> <span class=nb>str</span><span class=p>):</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Set up the information about a repository.</span>
+
+<span class=sd>        :param path: the path</span>
+<span class=sd>        :param url: the url</span>
+<span class=sd>        :param commit: the commit</span>
+<span class=sd>        :param date_time: the date and time</span>
+<span class=sd>        """</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>path</span><span class=p>,</span> <span class=n>Path</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>path</span><span class=p>,</span> <span class=s2>"path"</span><span class=p>,</span> <span class=n>Path</span><span class=p>)</span>
+        <span class=n>path</span><span class=o>.</span><span class=n>enforce_dir</span><span class=p>()</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"path"</span><span class=p>,</span> <span class=n>path</span><span class=p>)</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"url"</span><span class=p>,</span> <span class=n>_get_base_url</span><span class=p>(</span><span class=n>url</span><span class=p>))</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"commit"</span><span class=p>,</span>
+                           <span class=n>enforce_non_empty_str_without_ws</span><span class=p>(</span><span class=n>commit</span><span class=p>))</span>
+        <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>commit</span><span class=p>)</span> <span class=o>!=</span> <span class=mi>40</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Invalid commit: </span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>commit</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=k>try</span><span class=p>:</span>
+            <span class=nb>int</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>commit</span><span class=p>,</span> <span class=mi>16</span><span class=p>)</span>
+        <span class=k>except</span> <span class=ne>ValueError</span> <span class=k>as</span> <span class=n>e</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"Invalid commit information "</span>
+                             <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>commit</span><span class=si>!r}</span><span class=s2> for repo </span><span class=si>{</span><span class=n>url</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span> <span class=kn>from</span><span class=w> </span><span class=nn>e</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"date_time"</span><span class=p>,</span>
+                           <span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>date_time</span><span class=p>))</span>
+        <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"found repository in path </span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>path</span><span class=si>!r}</span><span class=s2> with commit "</span>
+               <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>commit</span><span class=si>!r}</span><span class=s2> for url </span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>url</span><span class=si>!r}</span><span class=s2> and "</span>
+               <span class=sa>f</span><span class=s2>"date </span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>date_time</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+
+<div class=viewcode-block id=GitRepository.download>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git.GitRepository.download>[docs]</a>
+    <span class=nd>@staticmethod</span>
+    <span class=k>def</span><span class=w> </span><span class=nf>download</span><span class=p>(</span><span class=n>url</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>dest_dir</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=s2>"GitRepository"</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Download a git repository.</span>
+
+<span class=sd>        :param url: the repository url</span>
+<span class=sd>        :param dest_dir: the destination directory</span>
+<span class=sd>        :return: the repository information</span>
+<span class=sd>        """</span>
+        <span class=n>dest</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=n>dest_dir</span><span class=p>)</span>
+        <span class=n>gt</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>git</span><span class=p>()</span>
+        <span class=n>dest</span><span class=o>.</span><span class=n>ensure_dir_exists</span><span class=p>()</span>
+        <span class=n>url</span> <span class=o>=</span> <span class=n>URL</span><span class=p>(</span><span class=n>url</span><span class=p>)</span>
+        <span class=n>s</span> <span class=o>=</span> <span class=sa>f</span><span class=s2>" repository </span><span class=si>{</span><span class=n>url</span><span class=si>!r}</span><span class=s2> to directory </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2>"</span>
+        <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"starting to load</span><span class=si>{</span><span class=n>s</span><span class=si>}</span><span class=s2> via </span><span class=si>{</span><span class=n>gt</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=k>try</span><span class=p>:</span>
+            <span class=n>Command</span><span class=p>([</span>
+                <span class=n>gt</span><span class=p>,</span> <span class=s2>"-C"</span><span class=p>,</span> <span class=n>dest</span><span class=p>,</span> <span class=s2>"clone"</span><span class=p>,</span> <span class=s2>"--depth"</span><span class=p>,</span> <span class=s2>"1"</span><span class=p>,</span> <span class=n>url</span><span class=p>,</span> <span class=n>dest</span><span class=p>],</span>
+                <span class=n>timeout</span><span class=o>=</span><span class=mi>600</span><span class=p>,</span> <span class=n>working_dir</span><span class=o>=</span><span class=n>dest</span><span class=p>)</span><span class=o>.</span><span class=n>execute</span><span class=p>(</span><span class=kc>True</span><span class=p>)</span>
+        <span class=k>except</span> <span class=ne>ValueError</span><span class=p>:</span>
+            <span class=k>if</span> <span class=ow>not</span> <span class=n>url</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=s2>"https://github.com"</span><span class=p>):</span>
+                <span class=k>raise</span>
+            <span class=n>url2</span> <span class=o>=</span> <span class=n>URL</span><span class=p>(</span><span class=sa>f</span><span class=s2>"ssh://git@</span><span class=si>{</span><span class=n>url</span><span class=p>[</span><span class=mi>8</span><span class=p>:]</span><span class=si>}</span><span class=s2>"</span><span class=p>)</span>
+            <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"timeout when loading url </span><span class=si>{</span><span class=n>url</span><span class=si>!r}</span><span class=s2>, so we try "</span>
+                   <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>url2</span><span class=si>!r}</span><span class=s2> instead, but first delete </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+            <span class=n>rmtree</span><span class=p>(</span><span class=n>dest</span><span class=p>,</span> <span class=n>ignore_errors</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+            <span class=n>dest</span><span class=o>.</span><span class=n>ensure_dir_exists</span><span class=p>()</span>
+            <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2> deleted and created, now re-trying cloning."</span><span class=p>)</span>
+            <span class=n>Command</span><span class=p>([</span>
+                <span class=n>gt</span><span class=p>,</span> <span class=s2>"-C"</span><span class=p>,</span> <span class=n>dest</span><span class=p>,</span> <span class=s2>"clone"</span><span class=p>,</span> <span class=s2>"--depth"</span><span class=p>,</span> <span class=s2>"1"</span><span class=p>,</span> <span class=n>url2</span><span class=p>,</span> <span class=n>dest</span><span class=p>],</span>
+                <span class=n>timeout</span><span class=o>=</span><span class=mi>600</span><span class=p>,</span> <span class=n>working_dir</span><span class=o>=</span><span class=n>dest</span><span class=p>)</span><span class=o>.</span><span class=n>execute</span><span class=p>(</span><span class=kc>True</span><span class=p>)</span>
+        <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"successfully finished loading</span><span class=si>{</span><span class=n>s</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+
+        <span class=k>return</span> <span class=n>GitRepository</span><span class=o>.</span><span class=n>from_local</span><span class=p>(</span><span class=n>path</span><span class=o>=</span><span class=n>dest</span><span class=p>,</span> <span class=n>url</span><span class=o>=</span><span class=n>url</span><span class=p>)</span></div>
+
+
+<div class=viewcode-block id=GitRepository.from_local>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git.GitRepository.from_local>[docs]</a>
+    <span class=nd>@staticmethod</span>
+    <span class=k>def</span><span class=w> </span><span class=nf>from_local</span><span class=p>(</span><span class=n>path</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>url</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=s2>"GitRepository"</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Load all the information from a local repository.</span>
+
+<span class=sd>        :param path: the path to the repository</span>
+<span class=sd>        :param url: the url</span>
+<span class=sd>        :return: the repository information</span>
+<span class=sd>        """</span>
+        <span class=n>dest</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=n>path</span><span class=p>)</span>
+        <span class=n>gt</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>git</span><span class=p>()</span>
+        <span class=n>dest</span><span class=o>.</span><span class=n>enforce_dir</span><span class=p>()</span>
+
+        <span class=n>logger</span><span class=p>(</span>
+            <span class=sa>f</span><span class=s2>"checking commit information of repo </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2> via </span><span class=si>{</span><span class=n>gt</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=n>stdout</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>Command</span><span class=p>(</span>
+            <span class=p>[</span><span class=n>gt</span><span class=p>,</span> <span class=s2>"-C"</span><span class=p>,</span> <span class=n>dest</span><span class=p>,</span> <span class=s2>"log"</span><span class=p>,</span> <span class=s2>"--no-abbrev-commit"</span><span class=p>,</span> <span class=s2>"-1"</span><span class=p>],</span>
+            <span class=n>timeout</span><span class=o>=</span><span class=mi>120</span><span class=p>,</span> <span class=n>working_dir</span><span class=o>=</span><span class=n>dest</span><span class=p>,</span> <span class=n>stdout</span><span class=o>=</span><span class=n>STREAM_CAPTURE</span><span class=p>)</span><span class=o>.</span><span class=n>execute</span><span class=p>(</span>
+            <span class=kc>True</span><span class=p>)[</span><span class=mi>0</span><span class=p>])</span>
+
+        <span class=n>match</span> <span class=o>=</span> <span class=n>search</span><span class=p>(</span><span class=n>_COMMIT</span><span class=p>,</span> <span class=n>stdout</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>match</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                <span class=sa>f</span><span class=s2>"Did not find commit information in repo </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=n>commit</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>enforce_non_empty_str_without_ws</span><span class=p>(</span><span class=n>match</span><span class=o>.</span><span class=n>group</span><span class=p>(</span><span class=mi>1</span><span class=p>))</span>
+        <span class=n>match</span> <span class=o>=</span> <span class=n>search</span><span class=p>(</span><span class=n>_DATE</span><span class=p>,</span> <span class=n>stdout</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>match</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                <span class=sa>f</span><span class=s2>"Did not find date information in repo </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=n>date_str</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>match</span><span class=o>.</span><span class=n>group</span><span class=p>(</span><span class=mi>1</span><span class=p>))</span>
+        <span class=n>date_raw</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>datetime</span><span class=o>.</span><span class=n>datetime</span><span class=p>]</span> <span class=o>=</span> <span class=n>datetime</span><span class=o>.</span><span class=n>datetime</span><span class=o>.</span><span class=n>strptime</span><span class=p>(</span>
+            <span class=n>date_str</span><span class=p>,</span> <span class=s2>"</span><span class=si>%a</span><span class=s2> %b </span><span class=si>%d</span><span class=s2> %H:%M:%S %Y %z"</span><span class=p>)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>date_raw</span><span class=p>,</span> <span class=n>datetime</span><span class=o>.</span><span class=n>datetime</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>date_raw</span><span class=p>,</span> <span class=s2>"date_raw"</span><span class=p>,</span> <span class=n>datetime</span><span class=o>.</span><span class=n>datetime</span><span class=p>)</span>
+        <span class=n>date_time</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>datetime_to_datetime_str</span><span class=p>(</span><span class=n>date_raw</span><span class=p>)</span>
+        <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"found commit </span><span class=si>{</span><span class=n>commit</span><span class=si>!r}</span><span class=s2> and date/time </span><span class=si>{</span><span class=n>date_time</span><span class=si>!r}</span><span class=s2> "</span>
+               <span class=sa>f</span><span class=s2>"for repo </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+
+        <span class=k>if</span> <span class=n>url</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"applying </span><span class=si>{</span><span class=n>gt</span><span class=si>!r}</span><span class=s2> to get url information."</span><span class=p>)</span>
+            <span class=n>url</span> <span class=o>=</span> <span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>Command</span><span class=p>(</span>
+                <span class=p>[</span><span class=n>gt</span><span class=p>,</span> <span class=s2>"-C"</span><span class=p>,</span> <span class=n>dest</span><span class=p>,</span> <span class=s2>"config"</span><span class=p>,</span> <span class=s2>"--get"</span><span class=p>,</span> <span class=s2>"remote.origin.url"</span><span class=p>],</span>
+                <span class=n>timeout</span><span class=o>=</span><span class=mi>120</span><span class=p>,</span> <span class=n>working_dir</span><span class=o>=</span><span class=n>dest</span><span class=p>,</span> <span class=n>stdout</span><span class=o>=</span><span class=n>STREAM_CAPTURE</span><span class=p>)</span>
+                <span class=o>.</span><span class=n>execute</span><span class=p>(</span><span class=kc>True</span><span class=p>)[</span><span class=mi>0</span><span class=p>])</span>
+            <span class=n>url</span> <span class=o>=</span> <span class=n>enforce_non_empty_str_without_ws</span><span class=p>(</span>
+                <span class=n>url</span><span class=o>.</span><span class=n>strip</span><span class=p>()</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=s2>"</span><span class=se>\n</span><span class=s2>"</span><span class=p>)[</span><span class=mi>0</span><span class=p>]</span><span class=o>.</span><span class=n>strip</span><span class=p>())</span>
+            <span class=k>if</span> <span class=n>url</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=s2>"/.git"</span><span class=p>):</span>
+                <span class=n>url</span> <span class=o>=</span> <span class=n>enforce_non_empty_str_without_ws</span><span class=p>(</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>url</span><span class=p>[:</span><span class=o>-</span><span class=mi>5</span><span class=p>]</span><span class=si>}</span><span class=s2>.git"</span><span class=p>)</span>
+            <span class=k>if</span> <span class=n>url</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=s2>"/"</span><span class=p>):</span>
+                <span class=n>url</span> <span class=o>=</span> <span class=n>enforce_non_empty_str_without_ws</span><span class=p>(</span><span class=n>url</span><span class=p>[:</span><span class=o>-</span><span class=mi>1</span><span class=p>])</span>
+            <span class=n>logger</span><span class=p>(</span><span class=sa>f</span><span class=s2>"found url </span><span class=si>{</span><span class=n>url</span><span class=si>!r}</span><span class=s2> for repo </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+            <span class=k>if</span> <span class=n>url</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=s2>"ssh://git@github.com"</span><span class=p>):</span>
+                <span class=n>url</span> <span class=o>=</span> <span class=sa>f</span><span class=s2>"https://</span><span class=si>{</span><span class=n>url</span><span class=p>[</span><span class=mi>10</span><span class=p>:]</span><span class=si>}</span><span class=s2>"</span>
+
+        <span class=k>return</span> <span class=n>GitRepository</span><span class=p>(</span><span class=n>dest</span><span class=p>,</span> <span class=n>url</span><span class=p>,</span> <span class=n>commit</span><span class=p>,</span> <span class=n>date_time</span><span class=p>)</span></div>
+
+
+<div class=viewcode-block id=GitRepository.make_url>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git.GitRepository.make_url>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>make_url</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>path</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=n>URL</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Make a url relative to this git repository.</span>
+
+<span class=sd>        :param path: the absolute path</span>
+<span class=sd>        :return: the url</span>
+<span class=sd>        """</span>
+        <span class=n>pt</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=n>path</span><span class=p>)</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>path</span><span class=o>.</span><span class=n>enforce_contains</span><span class=p>(</span><span class=n>pt</span><span class=p>)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=p>(</span><span class=n>pt</span><span class=o>.</span><span class=n>exists</span><span class=p>()</span> <span class=ow>and</span> <span class=p>(</span><span class=n>pt</span><span class=o>.</span><span class=n>is_file</span><span class=p>()</span> <span class=ow>or</span> <span class=n>pt</span><span class=o>.</span><span class=n>is_dir</span><span class=p>())):</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                <span class=sa>f</span><span class=s2>"Path </span><span class=si>{</span><span class=n>path</span><span class=si>!r}</span><span class=s2> does not exist in </span><span class=si>{</span><span class=bp>self</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+
+        <span class=n>relative_path</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>pt</span><span class=o>.</span><span class=n>relative_to</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>path</span><span class=p>)</span>
+        <span class=n>url</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>URL</span><span class=p>]</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>url</span>
+        <span class=k>return</span> <span class=n>URL</span><span class=p>(</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>url</span><span class=si>}</span><span class=s2>/blob/</span><span class=si>{</span><span class=bp>self</span><span class=o>.</span><span class=n>commit</span><span class=si>}</span><span class=s2>/</span><span class=si>{</span><span class=n>relative_path</span><span class=si>}</span><span class=s2>"</span>
+                   <span class=k>if</span> <span class=n>url</span><span class=o>.</span><span class=n>host</span> <span class=o>==</span> <span class=s2>"github.com"</span> <span class=k>else</span> <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>url</span><span class=si>}</span><span class=s2>/</span><span class=si>{</span><span class=n>relative_path</span><span class=si>}</span><span class=s2>"</span><span class=p>)</span></div>
+
+
+<div class=viewcode-block id=GitRepository.get_name>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git.GitRepository.get_name>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_name</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-></span> <span class=nb>str</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get the name of this git repository in the form 'user/name'.</span>
+
+<span class=sd>        :return: the name of this git repository in the form 'user/name'.</span>
+<span class=sd>        """</span>
+        <span class=n>base_url</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>url</span>
+        <span class=k>if</span> <span class=n>base_url</span><span class=o>.</span><span class=n>lower</span><span class=p>()</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=s2>".git"</span><span class=p>):</span>
+            <span class=n>base_url</span> <span class=o>=</span> <span class=n>enforce_non_empty_str_without_ws</span><span class=p>(</span><span class=n>base_url</span><span class=p>[:</span><span class=o>-</span><span class=mi>4</span><span class=p>])</span>
+        <span class=n>si</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=n>base_url</span><span class=o>.</span><span class=n>rfind</span><span class=p>(</span><span class=s2>"/"</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>si</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+            <span class=k>return</span> <span class=n>base_url</span>
+        <span class=n>si</span> <span class=o>=</span> <span class=nb>max</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=n>base_url</span><span class=o>.</span><span class=n>rfind</span><span class=p>(</span><span class=s2>"/"</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=n>si</span> <span class=o>-</span> <span class=mi>1</span><span class=p>))</span>
+        <span class=k>return</span> <span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>base_url</span><span class=p>[</span><span class=n>si</span> <span class=o>+</span> <span class=mi>1</span><span class=p>:]</span><span class=o>.</span><span class=n>strip</span><span class=p>())</span></div>
+</div>
+
+</pre></div><div class=clearer></div></div></div></div><div aria-label=Main class=sphinxsidebar role=navigation><div class=sphinxsidebarwrapper><search id=searchbox role=search style=display:none> <h3 id=searchlabel>Quick search</h3> <div class=searchformwrapper><form action=../../../search.html class=search><input aria-labelledby=searchlabel autocapitalize=off autocomplete=off autocorrect=off name=q spellcheck=false><input type=submit value=Go></form></div> </search><script>document.getElementById(`searchbox`).style.display=`block`;</script></div></div><div class=clearer></div></div><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.git</a></ul></div><div class=footer role=contentinfo>© Copyright 2023-2026, Thomas Weise.</div>

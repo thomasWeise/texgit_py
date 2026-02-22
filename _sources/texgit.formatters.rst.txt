@@ -1,0 +1,26 @@
+texgit.formatters package
+=========================
+
+.. automodule:: texgit.formatters
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+texgit.formatters.python module
+-------------------------------
+
+.. automodule:: texgit.formatters.python
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+texgit.formatters.source\_tools module
+--------------------------------------
+
+.. automodule:: texgit.formatters.source_tools
+   :members:
+   :show-inheritance:
+   :undoc-members:

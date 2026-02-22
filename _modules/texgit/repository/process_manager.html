@@ -1,0 +1,242 @@
+<!doctype html><html data-content_root=../../../ lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1.0"name=viewport><title>texgit.repository.process_manager — texgit 0.9.11 documentation</title><link href="../../../_static/pygments.css?v=b86133f3"rel=stylesheet><link href="../../../_static/bizstyle.css?v=5283bb3d"rel=stylesheet><script src="../../../_static/documentation_options.js?v=88b3baf9"></script><script src="../../../_static/doctools.js?v=9bcbadda"></script><script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script><script src=../../../_static/bizstyle.js></script><link href=https://thomasweise.github.io/texgit_py/_modules/texgit/repository/process_manager.html rel=canonical><link href=../../../genindex.html rel=index title=Index><link href=../../../search.html rel=search title=Search><meta content="width=device-width,initial-scale=1.0"name=viewport><body><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"accesskey=I href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a accesskey=U href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.process_manager</a></ul></div><div class=document><div class=documentwrapper><div class=bodywrapper><div class=body role=main><h1>Source code for texgit.repository.process_manager</h1><div class=highlight><pre>
+<span></span><span class=sd>"""</span>
+<span class=sd>A class for managing files and directories.</span>
+
+<span class=sd>A file manager provides a two-level abstraction for assigning names to paths.</span>
+<span class=sd>It exists within a certain base directory.</span>
+<span class=sd>Inside the base directory, it provides so-called "realms".</span>
+<span class=sd>Each realm is a separate namespace.</span>
+<span class=sd>With a realm, "names" are mapped to paths.</span>
+<span class=sd>The file manager ensures that the same realm-name combination is always</span>
+<span class=sd>assigned to the same path.</span>
+<span class=sd>The first time it is queried, the path is created.</span>
+<span class=sd>This path can be a file or a directory, depending on what was queried.</span>
+<span class=sd>Every realm-name combination always uniquely identifies a path and there can</span>
+<span class=sd>never be another realm-name combination pointing to the same path.</span>
+<span class=sd>The paths are randomized to avoid potential clashes.</span>
+
+<span class=sd>Once the file manager is closed, the realm-name to path associations are</span>
+<span class=sd>stored.</span>
+<span class=sd>When a new file manager instance is created for the same base directory, the</span>
+<span class=sd>associations of realms-names to paths are restored.</span>
+<span class=sd>This means that a program that creates output files for certain commands can</span>
+<span class=sd>then find these files again later.</span>
+<span class=sd>"""</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>os</span><span class=w> </span><span class=kn>import</span> <span class=n>environ</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>os.path</span><span class=w> </span><span class=kn>import</span> <span class=n>getsize</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>typing</span><span class=w> </span><span class=kn>import</span> <span class=n>Final</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>,</span> <span class=n>Mapping</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.ds.immutable_map</span><span class=w> </span><span class=kn>import</span> <span class=n>immutable_mapping</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.console</span><span class=w> </span><span class=kn>import</span> <span class=n>logger</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.path</span><span class=w> </span><span class=kn>import</span> <span class=n>Path</span><span class=p>,</span> <span class=n>write_lines</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.processes.python</span><span class=w> </span><span class=kn>import</span> <span class=n>PYTHON_ENV</span><span class=p>,</span> <span class=n>PYTHON_INTERPRETER</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.processes.shell</span><span class=w> </span><span class=kn>import</span> <span class=n>STREAM_CAPTURE</span><span class=p>,</span> <span class=n>Command</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.types</span><span class=w> </span><span class=kn>import</span> <span class=n>type_error</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>texgit.repository.fix_path</span><span class=w> </span><span class=kn>import</span> <span class=n>replace_base_path</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>texgit.repository.git_manager</span><span class=w> </span><span class=kn>import</span> <span class=n>GitManager</span><span class=p>,</span> <span class=n>GitPath</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>_write</span><span class=p>(</span><span class=n>orig</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>dest</span><span class=p>:</span> <span class=n>Path</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Write the string to the destination.</span>
+
+<span class=sd>    :param orig: the original string</span>
+<span class=sd>    :param dest: the destination</span>
+<span class=sd>    """</span>
+    <span class=n>orig</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>rstrip</span><span class=p>(</span><span class=n>orig</span><span class=p>)</span>
+    <span class=k>with</span> <span class=n>dest</span><span class=o>.</span><span class=n>open_for_write</span><span class=p>()</span> <span class=k>as</span> <span class=n>output</span><span class=p>:</span>
+        <span class=n>write_lines</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=nb>str</span><span class=o>.</span><span class=n>rstrip</span><span class=p>,</span> <span class=nb>str</span><span class=o>.</span><span class=n>rstrip</span><span class=p>(</span><span class=n>orig</span><span class=p>)</span><span class=o>.</span><span class=n>splitlines</span><span class=p>()),</span> <span class=n>output</span><span class=p>)</span>
+    <span class=n>logger</span><span class=p>(</span><span class=s2>"Wrote r-stripped string of originally "</span>
+           <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>orig</span><span class=p>)</span><span class=si>}</span><span class=s2> characters to </span><span class=si>{</span><span class=n>dest</span><span class=si>!r}</span><span class=s2>, "</span>
+           <span class=sa>f</span><span class=s2>"produced file of size </span><span class=si>{</span><span class=n>getsize</span><span class=p>(</span><span class=n>dest</span><span class=p>)</span><span class=si>}</span><span class=s2> bytes."</span><span class=p>)</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>__get_sys_env</span><span class=p>()</span> <span class=o>-></span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>]:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Get the system environment variables in the current environment.</span>
+
+<span class=sd>    :return: A mapping of variable names to values.</span>
+<span class=sd>    """</span>
+    <span class=n>base</span><span class=p>:</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>dict</span><span class=p>(</span><span class=n>environ</span><span class=p>)</span>
+    <span class=n>base</span><span class=o>.</span><span class=n>update</span><span class=p>(</span><span class=n>PYTHON_ENV</span><span class=p>)</span>
+    <span class=k>return</span> <span class=n>immutable_mapping</span><span class=p>(</span><span class=n>base</span><span class=p>)</span>
+
+
+<span class=c1>#: the environment that we will pass on</span>
+<span class=n>SYS_ENV</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>]]</span> <span class=o>=</span> <span class=n>__get_sys_env</span><span class=p>()</span>
+<span class=k>del</span> <span class=n>__get_sys_env</span>
+
+
+<div class=viewcode-block id=ProcessManager>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.process_manager.ProcessManager>[docs]</a>
+<span class=k>class</span><span class=w> </span><span class=nc>ProcessManager</span><span class=p>(</span><span class=n>GitManager</span><span class=p>):</span>
+<span class=w>    </span><span class=sd>"""A manager for processes."""</span>
+
+<div class=viewcode-block id=ProcessManager.get_argument_file>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.process_manager.ProcessManager.get_argument_file>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_argument_file</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>prefix</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+                          <span class=n>suffix</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Path</span><span class=p>,</span> <span class=nb>bool</span><span class=p>]:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Create a file in the argument realm.</span>
+
+<span class=sd>        :param name: the ID for the file</span>
+<span class=sd>        :param prefix: the optional prefix</span>
+<span class=sd>        :param suffix: the optional suffix</span>
+<span class=sd>        :return: the file, plus a `bool` indicating whether it was just</span>
+<span class=sd>            created (`True`) or already existed (`False`)</span>
+<span class=sd>        """</span>
+        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_file</span><span class=p>(</span>
+            <span class=s2>"args"</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=p>(</span><span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>prefix</span><span class=p>)</span> <span class=ow>or</span> <span class=kc>None</span><span class=p>)</span> <span class=k>if</span> <span class=n>prefix</span> <span class=k>else</span> <span class=kc>None</span><span class=p>,</span>
+            <span class=p>(</span><span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>suffix</span><span class=p>)</span> <span class=ow>or</span> <span class=kc>None</span><span class=p>)</span> <span class=k>if</span> <span class=n>suffix</span> <span class=k>else</span> <span class=kc>None</span><span class=p>)</span></div>
+
+
+<div class=viewcode-block id=ProcessManager.filter_argument>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.process_manager.ProcessManager.filter_argument>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>filter_argument</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>arg</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Filter an argument to be passed to any given file.</span>
+
+<span class=sd>        This function can be used to rewire arguments of certain programs that</span>
+<span class=sd>        we want to invoke to specific files.</span>
+
+<span class=sd>        :param arg: the argument</span>
+<span class=sd>        :return: the filtered argument</span>
+<span class=sd>        """</span>
+        <span class=n>arg</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>arg</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>arg</span><span class=p>:</span>
+            <span class=k>if</span> <span class=n>arg</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=s2>"(?"</span><span class=p>)</span> <span class=ow>and</span> <span class=n>arg</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=s2>"?)"</span><span class=p>):</span>
+                <span class=n>name</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>arg</span><span class=p>[</span><span class=mi>2</span><span class=p>:</span><span class=o>-</span><span class=mi>2</span><span class=p>])</span>
+                <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>name</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+                    <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Invalid ID in </span><span class=si>{</span><span class=n>arg</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+                <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_argument_file</span><span class=p>(</span><span class=n>name</span><span class=p>)[</span><span class=mi>0</span><span class=p>]</span>
+            <span class=k>return</span> <span class=n>arg</span>
+        <span class=k>return</span> <span class=kc>None</span></div>
+
+
+    <span class=k>def</span><span class=w> </span><span class=nf>__execute</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>dest</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span>
+                  <span class=n>command</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>str</span><span class=p>],</span>
+                  <span class=n>working_dir</span><span class=p>:</span> <span class=n>Path</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+                  <span class=n>stdin</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Make a command and environment.</span>
+
+<span class=sd>        :param dest: the destination path</span>
+<span class=sd>        :param command: the command</span>
+<span class=sd>        :param working_dir: an optional working directory</span>
+<span class=sd>        :param stdin: the standard input for the program, or `None`</span>
+<span class=sd>        """</span>
+        <span class=c1># process the command</span>
+        <span class=n>cmd_lst</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]]</span> <span class=o>=</span> <span class=p>[</span><span class=n>command</span><span class=p>]</span> <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>command</span><span class=p>,</span> <span class=nb>str</span><span class=p>)</span>\
+            <span class=k>else</span> <span class=nb>list</span><span class=p>(</span><span class=n>command</span><span class=p>)</span>
+        <span class=k>for</span> <span class=n>i</span> <span class=ow>in</span> <span class=nb>range</span><span class=p>(</span><span class=nb>list</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>cmd_lst</span><span class=p>)</span> <span class=o>-</span> <span class=mi>1</span><span class=p>,</span> <span class=o>-</span><span class=mi>1</span><span class=p>,</span> <span class=o>-</span><span class=mi>1</span><span class=p>):</span>
+            <span class=n>cmd</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>cmd_lst</span><span class=p>[</span><span class=n>i</span><span class=p>])</span>
+            <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>cmd</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+                <span class=k>del</span> <span class=n>cmd_lst</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>
+                <span class=k>continue</span>
+
+        <span class=c1># process the arguments</span>
+        <span class=k>for</span> <span class=n>i</span> <span class=ow>in</span> <span class=nb>range</span><span class=p>(</span><span class=nb>list</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>cmd_lst</span><span class=p>)</span> <span class=o>-</span> <span class=mi>1</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=o>-</span><span class=mi>1</span><span class=p>):</span>
+            <span class=n>cmd</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>filter_argument</span><span class=p>(</span><span class=n>cmd_lst</span><span class=p>[</span><span class=n>i</span><span class=p>])</span>
+            <span class=k>if</span> <span class=n>cmd</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+                <span class=k>del</span> <span class=n>cmd_lst</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>
+                <span class=k>continue</span>
+            <span class=n>cmd_lst</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=n>cmd</span>
+
+        <span class=k>if</span> <span class=nb>list</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>cmd_lst</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Invalid command </span><span class=si>{</span><span class=n>command</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+
+        <span class=c1># Now we need to fix the command if we are running inside a virtual</span>
+        <span class=c1># environment. If we are running inside a virtual environment, it is</span>
+        <span class=c1># necessary to use the same Python interpreter that was used to run</span>
+        <span class=c1># texgit. We should also pass along all the Python-related</span>
+        <span class=c1># environment parameters.</span>
+        <span class=n>env</span><span class=p>:</span> <span class=n>Mapping</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>SYS_ENV</span>
+        <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>cmd_lst</span><span class=p>[</span><span class=mi>0</span><span class=p>])</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=s2>"python3"</span><span class=p>):</span>
+            <span class=n>cmd_lst</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span> <span class=o>=</span> <span class=n>PYTHON_INTERPRETER</span>
+            <span class=n>env</span> <span class=o>=</span> <span class=n>PYTHON_ENV</span>
+
+        <span class=c1># execute the command and capture the output</span>
+        <span class=n>output</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>Command</span><span class=p>(</span>
+            <span class=n>command</span><span class=o>=</span><span class=n>cmd_lst</span><span class=p>,</span> <span class=n>working_dir</span><span class=o>=</span><span class=n>working_dir</span><span class=p>,</span> <span class=n>env</span><span class=o>=</span><span class=n>env</span><span class=p>,</span>
+            <span class=n>stdout</span><span class=o>=</span><span class=n>STREAM_CAPTURE</span><span class=p>,</span> <span class=n>stdin</span><span class=o>=</span><span class=n>stdin</span><span class=p>)</span><span class=o>.</span><span class=n>execute</span><span class=p>(</span><span class=kc>True</span><span class=p>)[</span><span class=mi>0</span><span class=p>]</span>
+
+        <span class=n>replace</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_get_sensitive_paths</span><span class=p>()</span>
+        <span class=n>replace</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>dest</span><span class=p>)</span>
+        <span class=n>replace</span><span class=o>.</span><span class=n>sort</span><span class=p>(</span><span class=n>key</span><span class=o>=</span><span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>,</span> <span class=n>reverse</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+        <span class=k>for</span> <span class=n>base_dir</span> <span class=ow>in</span> <span class=n>replace</span><span class=p>:</span>  <span class=c1># fix the base path</span>
+            <span class=n>output</span> <span class=o>=</span> <span class=n>replace_base_path</span><span class=p>(</span><span class=n>output</span><span class=p>,</span> <span class=n>base_dir</span><span class=p>)</span>
+        <span class=n>_write</span><span class=p>(</span><span class=n>output</span><span class=p>,</span> <span class=n>dest</span><span class=p>)</span>
+
+<div class=viewcode-block id=ProcessManager.get_output>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.process_manager.ProcessManager.get_output>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_output</span><span class=p>(</span>
+            <span class=bp>self</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>command</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>str</span><span class=p>],</span>
+            <span class=n>repo_url</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+            <span class=n>relative_dir</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=n>Path</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get the output of a certain command.</span>
+
+<span class=sd>        :param name: the name for the output</span>
+<span class=sd>        :param command: the command itself</span>
+<span class=sd>        :param repo_url: the optional repository URL</span>
+<span class=sd>        :param relative_dir: the optional directory inside the repository</span>
+<span class=sd>            where the command should be executed</span>
+<span class=sd>        :return: the path to the output and, if `repo_url` and `relative_dir`</span>
+<span class=sd>            were not `None`, then a URL pointing to the directory in the</span>
+<span class=sd>            repository, else `None`</span>
+<span class=sd>        """</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>_check_open</span><span class=p>()</span>
+        <span class=n>path</span><span class=p>,</span> <span class=n>is_new</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_file</span><span class=p>(</span><span class=s2>"output"</span><span class=p>,</span> <span class=n>name</span><span class=p>)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>is_new</span><span class=p>:</span>
+            <span class=k>return</span> <span class=n>path</span>
+
+        <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>repo_url</span><span class=p>,</span> <span class=nb>str</span><span class=p>):</span>
+            <span class=n>repo_url</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>repo_url</span><span class=p>)</span> <span class=ow>or</span> <span class=kc>None</span>
+        <span class=k>elif</span> <span class=n>repo_url</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>repo_url</span><span class=p>,</span> <span class=s2>"repo_url"</span><span class=p>,</span> <span class=p>(</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>))</span>
+
+        <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>relative_dir</span><span class=p>,</span> <span class=nb>str</span><span class=p>):</span>
+            <span class=n>relative_dir</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>relative_dir</span><span class=p>)</span> <span class=ow>or</span> <span class=kc>None</span>
+        <span class=k>elif</span> <span class=n>relative_dir</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>relative_dir</span><span class=p>,</span> <span class=s2>"relative_dir"</span><span class=p>,</span> <span class=p>(</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>))</span>
+        <span class=k>if</span> <span class=p>(</span><span class=n>repo_url</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>)</span> <span class=o>!=</span> <span class=p>(</span><span class=n>relative_dir</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"repo_url and relative_dir must either both be "</span>
+                             <span class=sa>f</span><span class=s2>"None or neither, but they are </span><span class=si>{</span><span class=n>repo_url</span><span class=si>!r}</span><span class=s2> "</span>
+                             <span class=sa>f</span><span class=s2>"and </span><span class=si>{</span><span class=n>relative_dir</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=n>working_dir</span><span class=p>:</span> <span class=n>Path</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+        <span class=k>if</span> <span class=n>repo_url</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=n>working_dir</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_git_dir</span><span class=p>(</span><span class=n>repo_url</span><span class=p>,</span> <span class=n>relative_dir</span><span class=p>)</span><span class=o>.</span><span class=n>path</span>
+
+        <span class=bp>self</span><span class=o>.</span><span class=n>__execute</span><span class=p>(</span><span class=n>dest</span><span class=o>=</span><span class=n>path</span><span class=p>,</span> <span class=n>command</span><span class=o>=</span><span class=n>command</span><span class=p>,</span> <span class=n>working_dir</span><span class=o>=</span><span class=n>working_dir</span><span class=p>)</span>
+        <span class=k>return</span> <span class=n>path</span></div>
+
+
+<div class=viewcode-block id=ProcessManager.get_git_file>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.process_manager.ProcessManager.get_git_file>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_git_file</span><span class=p>(</span>
+            <span class=bp>self</span><span class=p>,</span> <span class=n>repo_url</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>relative_file</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span>
+            <span class=n>name</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+            <span class=n>command</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=n>GitPath</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get a path to a postprocessed file from the given git repository.</span>
+
+<span class=sd>        :param repo_url: the repository url.</span>
+<span class=sd>        :param relative_file: the relative path to the file</span>
+<span class=sd>        :param name: the name for the output</span>
+<span class=sd>        :param command: the command itself</span>
+<span class=sd>        :return: a tuple of file and URL</span>
+<span class=sd>        """</span>
+        <span class=n>gf</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>GitPath</span><span class=p>]</span> <span class=o>=</span> <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=n>get_git_file</span><span class=p>(</span><span class=n>repo_url</span><span class=p>,</span> <span class=n>relative_file</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>command</span><span class=p>:</span>
+            <span class=n>name</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>name</span><span class=p>)</span>
+            <span class=n>path</span><span class=p>,</span> <span class=n>is_new</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_file</span><span class=p>(</span><span class=s2>"postprocessed"</span><span class=p>,</span> <span class=n>name</span><span class=p>)</span>
+            <span class=k>if</span> <span class=n>is_new</span><span class=p>:</span>
+                <span class=bp>self</span><span class=o>.</span><span class=n>__execute</span><span class=p>(</span><span class=n>dest</span><span class=o>=</span><span class=n>path</span><span class=p>,</span> <span class=n>command</span><span class=o>=</span><span class=n>command</span><span class=p>,</span>
+                               <span class=n>stdin</span><span class=o>=</span><span class=n>gf</span><span class=o>.</span><span class=n>path</span><span class=o>.</span><span class=n>read_all_str</span><span class=p>())</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>path</span> <span class=o>=</span> <span class=n>gf</span><span class=o>.</span><span class=n>path</span>
+        <span class=k>return</span> <span class=n>GitPath</span><span class=p>(</span><span class=n>path</span><span class=p>,</span> <span class=n>gf</span><span class=o>.</span><span class=n>repo</span><span class=p>,</span> <span class=n>gf</span><span class=o>.</span><span class=n>repo</span><span class=o>.</span><span class=n>make_url</span><span class=p>(</span><span class=n>gf</span><span class=o>.</span><span class=n>path</span><span class=p>),</span> <span class=n>gf</span><span class=o>.</span><span class=n>basename</span><span class=p>)</span></div>
+</div>
+
+</pre></div><div class=clearer></div></div></div></div><div aria-label=Main class=sphinxsidebar role=navigation><div class=sphinxsidebarwrapper><search id=searchbox role=search style=display:none> <h3 id=searchlabel>Quick search</h3> <div class=searchformwrapper><form action=../../../search.html class=search><input aria-labelledby=searchlabel autocapitalize=off autocomplete=off autocorrect=off name=q spellcheck=false><input type=submit value=Go></form></div> </search><script>document.getElementById(`searchbox`).style.display=`block`;</script></div></div><div class=clearer></div></div><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.process_manager</a></ul></div><div class=footer role=contentinfo>© Copyright 2023-2026, Thomas Weise.</div>

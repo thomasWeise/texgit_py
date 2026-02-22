@@ -1,0 +1,433 @@
+<!doctype html><html data-content_root=../../../ lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1.0"name=viewport><title>texgit.formatters.source_tools — texgit 0.9.11 documentation</title><link href="../../../_static/pygments.css?v=b86133f3"rel=stylesheet><link href="../../../_static/bizstyle.css?v=5283bb3d"rel=stylesheet><script src="../../../_static/documentation_options.js?v=88b3baf9"></script><script src="../../../_static/doctools.js?v=9bcbadda"></script><script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script><script src=../../../_static/bizstyle.js></script><link href=https://thomasweise.github.io/texgit_py/_modules/texgit/formatters/source_tools.html rel=canonical><link href=../../../genindex.html rel=index title=Index><link href=../../../search.html rel=search title=Search><meta content="width=device-width,initial-scale=1.0"name=viewport><body><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"accesskey=I href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a accesskey=U href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.formatters.source_tools</a></ul></div><div class=document><div class=documentwrapper><div class=bodywrapper><div class=body role=main><h1>Source code for texgit.formatters.source_tools</h1><div class=highlight><pre>
+<span></span><span class=sd>"""In this file, we put some shared tools for rendering source codes."""</span>
+
+<span class=kn>import</span><span class=w> </span><span class=nn>sys</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>re</span><span class=w> </span><span class=kn>import</span> <span class=n>MULTILINE</span><span class=p>,</span> <span class=n>Pattern</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>re</span><span class=w> </span><span class=kn>import</span> <span class=nb>compile</span> <span class=k>as</span> <span class=n>re_compile</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>typing</span><span class=w> </span><span class=kn>import</span> <span class=n>Callable</span><span class=p>,</span> <span class=n>Final</span><span class=p>,</span> <span class=n>Iterable</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.strings.enforce</span><span class=w> </span><span class=kn>import</span> <span class=n>enforce_non_empty_str</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.types</span><span class=w> </span><span class=kn>import</span> <span class=n>type_error</span>
+
+<span class=c1># the split pattern</span>
+<span class=n>__SPLT</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Pattern</span><span class=p>]</span> <span class=o>=</span> <span class=n>re_compile</span><span class=p>(</span><span class=sa>r</span><span class=s2>"[;,+\n\t ]"</span><span class=p>,</span> <span class=n>MULTILINE</span><span class=p>)</span>
+
+
+<div class=viewcode-block id=split_line_choices>
+<a class=viewcode-back href=../../../texgit.formatters.html#texgit.formatters.source_tools.split_line_choices>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>split_line_choices</span><span class=p>(</span><span class=n>lines</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=nb>list</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Split line choices to iterables of `int` or `None`.</span>
+
+<span class=sd>    This function converts `1`-based line selections into `0`-based ones.</span>
+
+<span class=sd>    :param lines: the line choices</span>
+<span class=sd>    :return: the split line choices.</span>
+
+<span class=sd>    >>> print(split_line_choices(None))</span>
+<span class=sd>    None</span>
+<span class=sd>    >>> print(split_line_choices(""))</span>
+<span class=sd>    None</span>
+<span class=sd>    >>> print(split_line_choices(","))</span>
+<span class=sd>    None</span>
+<span class=sd>    >>> split_line_choices("1")</span>
+<span class=sd>    [0]</span>
+<span class=sd>    >>> split_line_choices("1,2")</span>
+<span class=sd>    [0, 1]</span>
+<span class=sd>    >>> split_line_choices("1-5")</span>
+<span class=sd>    [0, 1, 2, 3, 4]</span>
+<span class=sd>    >>> split_line_choices("3;4-5;7-7;22+12-15;")</span>
+<span class=sd>    [2, 3, 4, 6, 21, 11, 12, 13, 14]</span>
+<span class=sd>    """</span>
+    <span class=k>if</span> <span class=n>lines</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=k>return</span> <span class=kc>None</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>lines</span><span class=p>,</span> <span class=nb>str</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>lines</span><span class=p>,</span> <span class=s2>"lines"</span><span class=p>,</span> <span class=p>(</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>))</span>
+    <span class=n>sel</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>=</span> <span class=p>[]</span>
+
+    <span class=k>for</span> <span class=n>patf</span> <span class=ow>in</span> <span class=n>__SPLT</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=n>lines</span><span class=p>):</span>
+        <span class=n>pats</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>patf</span><span class=o>.</span><span class=n>strip</span><span class=p>()</span>
+        <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>pats</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+            <span class=k>continue</span>
+        <span class=n>idx</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=n>pats</span><span class=o>.</span><span class=n>find</span><span class=p>(</span><span class=s2>"-"</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>idx</span> <span class=o><</span> <span class=mi>0</span><span class=p>:</span>
+            <span class=n>sel</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=nb>int</span><span class=p>(</span><span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>pats</span><span class=p>))</span> <span class=o>-</span> <span class=mi>1</span><span class=p>)</span>
+            <span class=k>continue</span>
+        <span class=n>start</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=nb>int</span><span class=p>(</span><span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>pats</span><span class=p>[:</span><span class=n>idx</span><span class=p>]</span><span class=o>.</span><span class=n>strip</span><span class=p>()))</span>
+        <span class=n>end</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=nb>int</span><span class=p>(</span><span class=n>enforce_non_empty_str</span><span class=p>(</span><span class=n>pats</span><span class=p>[</span><span class=n>idx</span> <span class=o>+</span> <span class=mi>1</span><span class=p>:]</span><span class=o>.</span><span class=n>strip</span><span class=p>()))</span>
+        <span class=n>sel</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=nb>range</span><span class=p>(</span><span class=n>start</span> <span class=o>-</span> <span class=mi>1</span><span class=p>,</span> <span class=n>end</span><span class=p>))</span>
+
+    <span class=k>return</span> <span class=n>sel</span> <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>sel</span><span class=p>)</span> <span class=o>></span> <span class=mi>0</span> <span class=k>else</span> <span class=kc>None</span></div>
+
+
+
+<div class=viewcode-block id=split_labels>
+<a class=viewcode-back href=../../../texgit.formatters.html#texgit.formatters.source_tools.split_labels>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>split_labels</span><span class=p>(</span><span class=n>labels</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=nb>set</span><span class=p>[</span><span class=nb>str</span><span class=p>]:</span>
+<span class=w>    </span><span class=sa>r</span><span class=sd>"""</span>
+<span class=sd>    Get a sequence of labels from a string.</span>
+
+<span class=sd>    :param labels: the labels string or `None`</span>
+<span class=sd>    :return: the labels set</span>
+
+<span class=sd>    >>> print(split_labels(None))</span>
+<span class=sd>    set()</span>
+<span class=sd>    >>> print(split_labels(""))</span>
+<span class=sd>    set()</span>
+<span class=sd>    >>> print(split_labels(","))</span>
+<span class=sd>    set()</span>
+<span class=sd>    >>> sorted(split_labels("a;b;d;c"))</span>
+<span class=sd>    ['a', 'b', 'c', 'd']</span>
+<span class=sd>    >>> sorted(split_labels("a,b c+a;a\td;c"))</span>
+<span class=sd>    ['a', 'b', 'c', 'd']</span>
+<span class=sd>    """</span>
+    <span class=n>sel</span><span class=p>:</span> <span class=nb>set</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=nb>set</span><span class=p>()</span>
+    <span class=k>if</span> <span class=n>labels</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=k>return</span> <span class=n>sel</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>labels</span><span class=p>,</span> <span class=nb>str</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>labels</span><span class=p>,</span> <span class=s2>"labels"</span><span class=p>,</span> <span class=p>(</span><span class=nb>str</span><span class=p>,</span> <span class=kc>None</span><span class=p>))</span>
+
+    <span class=k>for</span> <span class=n>patf</span> <span class=ow>in</span> <span class=n>__SPLT</span><span class=o>.</span><span class=n>split</span><span class=p>(</span><span class=n>labels</span><span class=p>):</span>
+        <span class=n>pats</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>patf</span><span class=o>.</span><span class=n>strip</span><span class=p>()</span>
+        <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>pats</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+            <span class=k>continue</span>
+        <span class=n>sel</span><span class=o>.</span><span class=n>add</span><span class=p>(</span><span class=n>pats</span><span class=p>)</span>
+    <span class=k>return</span> <span class=n>sel</span></div>
+
+
+
+<div class=viewcode-block id=select_lines>
+<a class=viewcode-back href=../../../texgit.formatters.html#texgit.formatters.source_tools.select_lines>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>select_lines</span><span class=p>(</span><span class=n>code</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>str</span><span class=p>],</span>
+                 <span class=n>lines</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+                 <span class=n>labels</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+                 <span class=n>line_comment_start</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>"#"</span><span class=p>,</span>
+                 <span class=n>max_consecutive_empty_lines</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>2</span><span class=p>)</span> <span class=o>-></span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]:</span>
+<span class=w>    </span><span class=sa>r</span><span class=sd>"""</span>
+<span class=sd>    Select lines of source code based on labels and line indices.</span>
+
+<span class=sd>    First, we select all lines of the code we want to keep.</span>
+<span class=sd>    If labels are defined, then lines are kept as ranges or as single lines</span>
+<span class=sd>    for all pre-defined labels. Ranges may overlap and/or intersect.</span>
+<span class=sd>    Otherwise, all lines are selected in this step.</span>
+
+<span class=sd>    Then, if line numbers are provided, we selected the lines based on the</span>
+<span class=sd>    line numbers from the lines we have preserved.</span>
+
+<span class=sd>    Finally, leading and trailing empty lines as well as superfluous empty</span>
+<span class=sd>    lines are removed.</span>
+
+<span class=sd>    :param code: the code loaded from a file</span>
+<span class=sd>    :param lines: the lines to keep, or `None` if we keep all</span>
+<span class=sd>    :param labels: a list of labels marking start and</span>
+<span class=sd>        end of code snippets to include</span>
+<span class=sd>    :param line_comment_start: the string marking the line comment start</span>
+<span class=sd>    :param max_consecutive_empty_lines: the maximum number of permitted</span>
+<span class=sd>        consecutive empty lines</span>
+<span class=sd>    :return: the list of selected lines</span>
+
+<span class=sd>    >>> select_lines(["def a():", "    b=c", "    return x"])</span>
+<span class=sd>    ['def a():', '    b=c', '    return x']</span>
+<span class=sd>    >>> pc = ["# start x", "def a():", " b=c # -x", "    return x", "# end x"]</span>
+<span class=sd>    >>> select_lines(pc, labels={"x"})</span>
+<span class=sd>    ['def a():', '    return x']</span>
+<span class=sd>    >>> select_lines(["def a():", "    b=c", "    return x"], lines=[0, 2])</span>
+<span class=sd>    ['def a():', '    return x']</span>
+<span class=sd>    """</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>code</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>code</span><span class=p>,</span> <span class=s2>"code"</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>max_consecutive_empty_lines</span><span class=p>,</span> <span class=nb>int</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span>
+            <span class=n>max_consecutive_empty_lines</span><span class=p>,</span> <span class=s2>"max_consecutive_empty_lines"</span><span class=p>,</span> <span class=nb>int</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>max_consecutive_empty_lines</span> <span class=o><</span> <span class=mi>0</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"max_consecutive_empty_lines must be >= 0, but is "</span>
+                         <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>max_consecutive_empty_lines</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>line_comment_start</span><span class=p>,</span> <span class=nb>str</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>line_comment_start</span><span class=p>,</span> <span class=s2>"line_comment_start"</span><span class=p>,</span> <span class=nb>str</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>line_comment_start</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"line_comment_start cannot be "</span>
+                         <span class=sa>f</span><span class=s2>"'</span><span class=si>{</span><span class=n>line_comment_start</span><span class=si>}</span><span class=s2>'."</span><span class=p>)</span>
+
+    <span class=n>keep_lines</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span>
+
+    <span class=c1># make sure that labels are unique and non-empty</span>
+    <span class=n>label_str</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+    <span class=k>if</span> <span class=n>labels</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>labels</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>labels</span><span class=p>,</span> <span class=s2>"labels"</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>)</span>
+        <span class=n>label_lst</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=n>labels</span><span class=p>)</span>
+        <span class=n>label_lst</span><span class=o>.</span><span class=n>sort</span><span class=p>()</span>
+        <span class=n>label_str</span> <span class=o>=</span> <span class=nb>list</span><span class=p>({</span><span class=n>label</span><span class=o>.</span><span class=n>strip</span><span class=p>()</span> <span class=k>for</span> <span class=n>label</span> <span class=ow>in</span> <span class=n>label_lst</span><span class=p>})</span>
+        <span class=n>label_str</span><span class=o>.</span><span class=n>sort</span><span class=p>()</span>
+        <span class=k>if</span> <span class=n>label_lst</span> <span class=o>!=</span> <span class=n>label_str</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                <span class=sa>f</span><span class=s2>"Invalid label spec </span><span class=si>{</span><span class=n>label_lst</span><span class=si>}</span><span class=s2> of length </span><span class=si>{</span><span class=nb>len</span><span class=p>(</span><span class=n>label_lst</span><span class=p>)</span><span class=si>}</span><span class=s2>,"</span>
+                <span class=sa>f</span><span class=s2>" leading to unique label set </span><span class=si>{</span><span class=n>label_str</span><span class=si>}</span><span class=s2> of length "</span>
+                <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=nb>len</span><span class=p>(</span><span class=n>label_str</span><span class=p>)</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=k>del</span> <span class=n>label_lst</span>
+        <span class=k>if</span> <span class=n>label_str</span> <span class=ow>and</span> <span class=ow>not</span> <span class=p>(</span><span class=n>label_str</span><span class=p>[</span><span class=mi>0</span><span class=p>]):</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Empty label in </span><span class=si>{</span><span class=n>labels</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+
+    <span class=c1># process all labels, if any are specified</span>
+    <span class=k>if</span> <span class=n>label_str</span><span class=p>:</span>
+        <span class=n>keep_lines</span> <span class=o>=</span> <span class=p>[]</span>
+
+        <span class=n>start_labels</span> <span class=o>=</span> <span class=p>[</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>line_comment_start</span><span class=si>}</span><span class=s2> start </span><span class=si>{</span><span class=n>label</span><span class=si>}</span><span class=s2>"</span>
+                        <span class=k>for</span> <span class=n>label</span> <span class=ow>in</span> <span class=n>label_str</span><span class=p>]</span>
+        <span class=n>end_labels</span> <span class=o>=</span> <span class=p>[</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>line_comment_start</span><span class=si>}</span><span class=s2> end </span><span class=si>{</span><span class=n>label</span><span class=si>}</span><span class=s2>"</span>
+                      <span class=k>for</span> <span class=n>label</span> <span class=ow>in</span> <span class=n>label_str</span><span class=p>]</span>
+        <span class=n>add_labels</span> <span class=o>=</span> <span class=p>[</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>line_comment_start</span><span class=si>}</span><span class=s2> +</span><span class=si>{</span><span class=n>label</span><span class=si>}</span><span class=s2>"</span> <span class=k>for</span> <span class=n>label</span> <span class=ow>in</span> <span class=n>label_str</span><span class=p>]</span>
+        <span class=n>del_labels</span> <span class=o>=</span> <span class=p>[</span><span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>line_comment_start</span><span class=si>}</span><span class=s2> -</span><span class=si>{</span><span class=n>label</span><span class=si>}</span><span class=s2>"</span> <span class=k>for</span> <span class=n>label</span> <span class=ow>in</span> <span class=n>label_str</span><span class=p>]</span>
+        <span class=n>all_labels</span> <span class=o>=</span> <span class=nb>set</span><span class=p>(</span><span class=n>start_labels</span> <span class=o>+</span> <span class=n>end_labels</span> <span class=o>+</span> <span class=n>add_labels</span> <span class=o>+</span> <span class=n>del_labels</span><span class=p>)</span>
+        <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>all_labels</span><span class=p>)</span> <span class=o>!=</span> <span class=p>(</span><span class=mi>4</span> <span class=o>*</span> <span class=nb>len</span><span class=p>(</span><span class=n>label_str</span><span class=p>)):</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"label clash? impossible?"</span><span class=p>)</span>
+        <span class=k>del</span> <span class=n>all_labels</span>
+
+        <span class=n>active_labels</span><span class=p>:</span> <span class=nb>set</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>=</span> <span class=nb>set</span><span class=p>()</span>  <span class=c1># the active label ranges</span>
+        <span class=n>current_line_labels</span><span class=p>:</span> <span class=nb>set</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>=</span> <span class=nb>set</span><span class=p>()</span>  <span class=c1># labels of the current line</span>
+        <span class=n>done_labels</span><span class=p>:</span> <span class=nb>set</span><span class=p>[</span><span class=nb>int</span><span class=p>]</span> <span class=o>=</span> <span class=nb>set</span><span class=p>()</span>  <span class=c1># the labels for which text as retained</span>
+
+        <span class=k>for</span> <span class=n>line</span><span class=p>,</span> <span class=n>the_cl</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=n>code</span><span class=p>):</span>  <span class=c1># iterate over all code lines</span>
+            <span class=n>cl</span> <span class=o>=</span> <span class=n>the_cl</span><span class=o>.</span><span class=n>rstrip</span><span class=p>()</span>
+
+            <span class=c1># first, we need to update the state</span>
+            <span class=n>current_line_labels</span><span class=o>.</span><span class=n>clear</span><span class=p>()</span>
+            <span class=n>current_line_labels</span><span class=o>.</span><span class=n>update</span><span class=p>(</span><span class=n>active_labels</span><span class=p>)</span>
+            <span class=n>found_mark</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span>
+            <span class=k>while</span> <span class=n>found_mark</span><span class=p>:</span>
+                <span class=n>found_mark</span> <span class=o>=</span> <span class=kc>False</span>
+
+                <span class=c1># check all potential range starts</span>
+                <span class=k>for</span> <span class=n>i</span><span class=p>,</span> <span class=n>lbl</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=n>start_labels</span><span class=p>):</span>
+                    <span class=k>if</span> <span class=n>cl</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=n>lbl</span><span class=p>):</span>
+                        <span class=n>cl</span> <span class=o>=</span> <span class=n>cl</span><span class=p>[:</span><span class=nb>len</span><span class=p>(</span><span class=n>cl</span><span class=p>)</span> <span class=o>-</span> <span class=nb>len</span><span class=p>(</span><span class=n>lbl</span><span class=p>)]</span><span class=o>.</span><span class=n>rstrip</span><span class=p>()</span>
+                        <span class=k>if</span> <span class=n>i</span> <span class=ow>in</span> <span class=n>active_labels</span><span class=p>:</span>
+                            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                                <span class=sa>f</span><span class=s2>"Label '</span><span class=si>{</span><span class=n>label_str</span><span class=p>[</span><span class=n>i</span><span class=p>]</span><span class=si>}</span><span class=s2>' already active in "</span>
+                                <span class=sa>f</span><span class=s2>"line </span><span class=si>{</span><span class=n>line</span><span class=si>}</span><span class=s2> with text '</span><span class=si>{</span><span class=n>cl</span><span class=si>}</span><span class=s2>', cannot "</span>
+                                <span class=s2>"start."</span><span class=p>)</span>
+                        <span class=n>active_labels</span><span class=o>.</span><span class=n>add</span><span class=p>(</span><span class=n>i</span><span class=p>)</span>
+                        <span class=n>found_mark</span> <span class=o>=</span> <span class=kc>True</span>
+
+                <span class=c1># check all potential range end</span>
+                <span class=k>for</span> <span class=n>i</span><span class=p>,</span> <span class=n>lbl</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=n>end_labels</span><span class=p>):</span>
+                    <span class=k>if</span> <span class=n>cl</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=n>lbl</span><span class=p>):</span>
+                        <span class=n>cl</span> <span class=o>=</span> <span class=n>cl</span><span class=p>[:</span><span class=nb>len</span><span class=p>(</span><span class=n>cl</span><span class=p>)</span> <span class=o>-</span> <span class=nb>len</span><span class=p>(</span><span class=n>lbl</span><span class=p>)]</span><span class=o>.</span><span class=n>rstrip</span><span class=p>()</span>
+                        <span class=k>if</span> <span class=n>i</span> <span class=ow>not</span> <span class=ow>in</span> <span class=n>active_labels</span><span class=p>:</span>
+                            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                                <span class=sa>f</span><span class=s2>"Label '</span><span class=si>{</span><span class=n>label_str</span><span class=p>[</span><span class=n>i</span><span class=p>]</span><span class=si>}</span><span class=s2>' not active in "</span>
+                                <span class=sa>f</span><span class=s2>"line </span><span class=si>{</span><span class=n>line</span><span class=si>}</span><span class=s2> with text '</span><span class=si>{</span><span class=n>cl</span><span class=si>}</span><span class=s2>', cannot "</span>
+                                <span class=s2>"end."</span><span class=p>)</span>
+                        <span class=n>active_labels</span><span class=o>.</span><span class=n>remove</span><span class=p>(</span><span class=n>i</span><span class=p>)</span>
+                        <span class=n>current_line_labels</span><span class=o>.</span><span class=n>remove</span><span class=p>(</span><span class=n>i</span><span class=p>)</span>
+                        <span class=n>found_mark</span> <span class=o>=</span> <span class=kc>True</span>
+
+                <span class=c1># check all potential line add labels</span>
+                <span class=k>for</span> <span class=n>i</span><span class=p>,</span> <span class=n>lbl</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=n>add_labels</span><span class=p>):</span>
+                    <span class=k>if</span> <span class=n>cl</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=n>lbl</span><span class=p>):</span>
+                        <span class=n>cl</span> <span class=o>=</span> <span class=n>cl</span><span class=p>[:</span><span class=nb>len</span><span class=p>(</span><span class=n>cl</span><span class=p>)</span> <span class=o>-</span> <span class=nb>len</span><span class=p>(</span><span class=n>lbl</span><span class=p>)]</span><span class=o>.</span><span class=n>rstrip</span><span class=p>()</span>
+                        <span class=k>if</span> <span class=n>i</span> <span class=ow>in</span> <span class=n>current_line_labels</span><span class=p>:</span>
+                            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                                <span class=sa>f</span><span class=s2>"Label '</span><span class=si>{</span><span class=n>label_str</span><span class=p>[</span><span class=n>i</span><span class=p>]</span><span class=si>}</span><span class=s2>' already active in "</span>
+                                <span class=sa>f</span><span class=s2>"line </span><span class=si>{</span><span class=n>line</span><span class=si>}</span><span class=s2> with text '</span><span class=si>{</span><span class=n>cl</span><span class=si>}</span><span class=s2>', cannot "</span>
+                                <span class=s2>"add."</span><span class=p>)</span>
+                        <span class=n>current_line_labels</span><span class=o>.</span><span class=n>add</span><span class=p>(</span><span class=n>i</span><span class=p>)</span>
+                        <span class=n>found_mark</span> <span class=o>=</span> <span class=kc>True</span>
+
+                <span class=c1># check all potential line deletion markers</span>
+                <span class=k>for</span> <span class=n>i</span><span class=p>,</span> <span class=n>lbl</span> <span class=ow>in</span> <span class=nb>enumerate</span><span class=p>(</span><span class=n>del_labels</span><span class=p>):</span>
+                    <span class=k>if</span> <span class=n>cl</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=n>lbl</span><span class=p>):</span>
+                        <span class=n>cl</span> <span class=o>=</span> <span class=n>cl</span><span class=p>[:</span><span class=nb>len</span><span class=p>(</span><span class=n>cl</span><span class=p>)</span> <span class=o>-</span> <span class=nb>len</span><span class=p>(</span><span class=n>lbl</span><span class=p>)]</span><span class=o>.</span><span class=n>rstrip</span><span class=p>()</span>
+                        <span class=k>if</span> <span class=n>i</span> <span class=ow>not</span> <span class=ow>in</span> <span class=n>current_line_labels</span><span class=p>:</span>
+                            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                                <span class=sa>f</span><span class=s2>"Label '</span><span class=si>{</span><span class=n>label_str</span><span class=p>[</span><span class=n>i</span><span class=p>]</span><span class=si>}</span><span class=s2>' already active in "</span>
+                                <span class=sa>f</span><span class=s2>"line </span><span class=si>{</span><span class=n>line</span><span class=si>}</span><span class=s2> with text '</span><span class=si>{</span><span class=n>cl</span><span class=si>}</span><span class=s2>', cannot "</span>
+                                <span class=s2>"delete."</span><span class=p>)</span>
+                        <span class=n>current_line_labels</span><span class=o>.</span><span class=n>remove</span><span class=p>(</span><span class=n>i</span><span class=p>)</span>
+                        <span class=n>found_mark</span> <span class=o>=</span> <span class=kc>True</span>
+                        <span class=k>break</span>
+                <span class=k>if</span> <span class=n>found_mark</span><span class=p>:</span>
+                    <span class=k>continue</span>
+
+            <span class=k>if</span> <span class=n>current_line_labels</span><span class=p>:</span>
+                <span class=n>keep_lines</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>cl</span><span class=p>)</span>
+                <span class=n>done_labels</span><span class=o>.</span><span class=n>update</span><span class=p>(</span><span class=n>current_line_labels</span><span class=p>)</span>
+
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>keep_lines</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                <span class=sa>f</span><span class=s2>"Nothing is left over after applying labels </span><span class=si>{</span><span class=n>labels</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>done_labels</span><span class=p>)</span> <span class=o><</span> <span class=nb>len</span><span class=p>(</span><span class=n>label_str</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
+                <span class=s2>"Never had any text for labels "</span>
+                <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=nb>set</span><span class=p>(</span><span class=n>label_str</span><span class=p>)</span><span class=o>.</span><span class=n>difference</span><span class=p>(</span><span class=n>done_labels</span><span class=p>)</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+    <span class=k>else</span><span class=p>:</span>
+        <span class=n>keep_lines</span> <span class=o>=</span> <span class=p>[</span><span class=n>cl</span><span class=o>.</span><span class=n>rstrip</span><span class=p>()</span> <span class=k>for</span> <span class=n>cl</span> <span class=ow>in</span> <span class=n>code</span><span class=p>]</span>
+
+    <span class=k>if</span> <span class=n>lines</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>  <span class=c1># select the lines we want to keep</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>lines</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>lines</span><span class=p>,</span> <span class=s2>"lines"</span><span class=p>,</span> <span class=n>Iterable</span><span class=p>)</span>
+        <span class=n>lines_ints</span> <span class=o>=</span> <span class=nb>list</span><span class=p>(</span><span class=nb>set</span><span class=p>(</span><span class=n>lines</span><span class=p>))</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>lines_ints</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Empty lines provided: </span><span class=si>{</span><span class=n>lines</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=n>lines_ints</span><span class=o>.</span><span class=n>sort</span><span class=p>()</span>
+        <span class=n>keep_lines</span> <span class=o>=</span> <span class=p>[</span><span class=n>keep_lines</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=k>for</span> <span class=n>i</span> <span class=ow>in</span> <span class=n>lines_ints</span><span class=p>]</span>
+
+    <span class=c1># remove leading empty lines</span>
+    <span class=k>while</span> <span class=n>keep_lines</span><span class=p>:</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>keep_lines</span><span class=p>[</span><span class=mi>0</span><span class=p>]:</span>
+            <span class=k>del</span> <span class=n>keep_lines</span><span class=p>[</span><span class=mi>0</span><span class=p>]</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=k>break</span>
+
+    <span class=c1># remove trailing empty lines</span>
+    <span class=k>while</span> <span class=n>keep_lines</span><span class=p>:</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>keep_lines</span><span class=p>[</span><span class=o>-</span><span class=mi>1</span><span class=p>]:</span>
+            <span class=k>del</span> <span class=n>keep_lines</span><span class=p>[</span><span class=o>-</span><span class=mi>1</span><span class=p>]</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=k>break</span>
+
+    <span class=c1># remove superfluous empty lines</span>
+    <span class=n>empty_lines</span> <span class=o>=</span> <span class=mi>0</span>
+    <span class=n>current</span> <span class=o>=</span> <span class=nb>len</span><span class=p>(</span><span class=n>keep_lines</span><span class=p>)</span>
+    <span class=k>while</span> <span class=n>current</span> <span class=o>></span> <span class=mi>0</span><span class=p>:</span>
+        <span class=n>current</span> <span class=o>-=</span> <span class=mi>1</span>
+        <span class=k>if</span> <span class=n>keep_lines</span><span class=p>[</span><span class=n>current</span><span class=p>]:</span>
+            <span class=n>empty_lines</span> <span class=o>=</span> <span class=mi>0</span>
+        <span class=k>elif</span> <span class=n>empty_lines</span> <span class=o>>=</span> <span class=n>max_consecutive_empty_lines</span><span class=p>:</span>
+            <span class=k>del</span> <span class=n>keep_lines</span><span class=p>[</span><span class=n>current</span><span class=p>]</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>empty_lines</span> <span class=o>+=</span> <span class=mi>1</span>
+
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>keep_lines</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"Empty code resulting from </span><span class=si>{</span><span class=n>code</span><span class=si>}</span><span class=s2> after applying "</span>
+                         <span class=sa>f</span><span class=s2>"labels </span><span class=si>{</span><span class=n>labels</span><span class=si>}</span><span class=s2> and lines </span><span class=si>{</span><span class=n>lines</span><span class=si>}</span><span class=s2>.?"</span><span class=p>)</span>
+
+    <span class=k>return</span> <span class=n>keep_lines</span></div>
+
+
+
+<div class=viewcode-block id=format_empty_lines>
+<a class=viewcode-back href=../../../texgit.formatters.html#texgit.formatters.source_tools.format_empty_lines>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>format_empty_lines</span><span class=p>(</span><span class=n>lines</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>str</span><span class=p>],</span>
+                       <span class=n>empty_before</span><span class=p>:</span> <span class=n>Callable</span> <span class=o>=</span> <span class=k>lambda</span> <span class=n>_</span><span class=p>:</span> <span class=kc>False</span><span class=p>,</span>
+                       <span class=n>no_empty_after</span><span class=p>:</span> <span class=n>Callable</span> <span class=o>=</span> <span class=k>lambda</span> <span class=n>_</span><span class=p>:</span> <span class=kc>False</span><span class=p>,</span>
+                       <span class=n>force_no_empty_after</span><span class=p>:</span> <span class=n>Callable</span> <span class=o>=</span> <span class=k>lambda</span> <span class=n>_</span><span class=p>:</span> <span class=kc>False</span><span class=p>,</span>
+                       <span class=n>max_consecutive_empty_lines</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>2</span><span class=p>)</span> <span class=o>-></span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Obtain a generator that strips any consecutive empty lines.</span>
+
+<span class=sd>    :param lines: the original line iterable</span>
+<span class=sd>    :param empty_before: a function checking whether an empty line</span>
+<span class=sd>        is required before a certain string</span>
+<span class=sd>    :param no_empty_after: a function checking whether an empty line</span>
+<span class=sd>        is prohibited after a string</span>
+<span class=sd>    :param force_no_empty_after: a function checking whether an empty</span>
+<span class=sd>        line is prohibited after a string</span>
+<span class=sd>    :param max_consecutive_empty_lines: the maximum number of permitted</span>
+<span class=sd>        consecutive empty lines</span>
+<span class=sd>    :return: the generation</span>
+
+<span class=sd>    >>> code = ["", "a", "", "b", "", "", "c", "", "", "", "d", "e", ""]</span>
+<span class=sd>    >>> format_empty_lines(code, max_consecutive_empty_lines=3)</span>
+<span class=sd>    ['a', '', 'b', '', '', 'c', '', '', '', 'd', 'e']</span>
+<span class=sd>    >>> format_empty_lines(code, max_consecutive_empty_lines=2)</span>
+<span class=sd>    ['a', '', 'b', '', '', 'c', '', '', 'd', 'e']</span>
+<span class=sd>    >>> format_empty_lines(code, max_consecutive_empty_lines=1)</span>
+<span class=sd>    ['a', '', 'b', '', 'c', '', 'd', 'e']</span>
+<span class=sd>    >>> format_empty_lines(code, max_consecutive_empty_lines=0)</span>
+<span class=sd>    ['a', 'b', 'c', 'd', 'e']</span>
+<span class=sd>    >>> format_empty_lines(code, max_consecutive_empty_lines=2,</span>
+<span class=sd>    ...                    no_empty_after=lambda s: s == "b")</span>
+<span class=sd>    ['a', '', 'b', 'c', '', '', 'd', 'e']</span>
+<span class=sd>    >>> format_empty_lines(code, max_consecutive_empty_lines=2,</span>
+<span class=sd>    ...                    no_empty_after=lambda s: s == "b",</span>
+<span class=sd>    ...                    empty_before=lambda s: s == "e")</span>
+<span class=sd>    ['a', '', 'b', 'c', '', '', 'd', '', 'e']</span>
+<span class=sd>    >>> format_empty_lines(code, max_consecutive_empty_lines=2,</span>
+<span class=sd>    ...                    no_empty_after=lambda s: s == "b",</span>
+<span class=sd>    ...                    empty_before=lambda s: s == "e",</span>
+<span class=sd>    ...                    force_no_empty_after=lambda s: s == "d")</span>
+<span class=sd>    ['a', '', 'b', 'c', '', '', 'd', 'e']</span>
+<span class=sd>    """</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>max_consecutive_empty_lines</span><span class=p>,</span> <span class=nb>int</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span>
+            <span class=n>max_consecutive_empty_lines</span><span class=p>,</span> <span class=s2>"max_consecutive_empty_lines"</span><span class=p>,</span> <span class=nb>int</span><span class=p>)</span>
+    <span class=k>if</span> <span class=n>max_consecutive_empty_lines</span> <span class=o><</span> <span class=mi>0</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"max_consecutive_empty_lines must be >= 0, but is "</span>
+                         <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>max_consecutive_empty_lines</span><span class=si>}</span><span class=s2>."</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>callable</span><span class=p>(</span><span class=n>empty_before</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>empty_before</span><span class=p>,</span> <span class=s2>"empty_before"</span><span class=p>,</span> <span class=n>call</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>callable</span><span class=p>(</span><span class=n>no_empty_after</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>no_empty_after</span><span class=p>,</span> <span class=s2>"no_empty_after"</span><span class=p>,</span> <span class=n>call</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>callable</span><span class=p>(</span><span class=n>force_no_empty_after</span><span class=p>):</span>
+        <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span>
+            <span class=n>force_no_empty_after</span><span class=p>,</span> <span class=s2>"force_no_empty_after"</span><span class=p>,</span> <span class=n>call</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+
+    <span class=n>result</span><span class=p>:</span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=p>[]</span>
+    <span class=n>print_empty</span><span class=p>:</span> <span class=nb>int</span> <span class=o>=</span> <span class=mi>0</span>
+    <span class=n>no_empty</span> <span class=o>=</span> <span class=kc>True</span>
+    <span class=n>force_no_empty</span> <span class=o>=</span> <span class=kc>True</span>
+    <span class=k>for</span> <span class=n>the_line</span> <span class=ow>in</span> <span class=n>lines</span><span class=p>:</span>
+        <span class=n>line</span> <span class=o>=</span> <span class=n>the_line</span><span class=o>.</span><span class=n>rstrip</span><span class=p>()</span>
+        <span class=n>ltr</span> <span class=o>=</span> <span class=n>line</span><span class=o>.</span><span class=n>lstrip</span><span class=p>()</span>
+
+        <span class=k>if</span> <span class=n>line</span><span class=p>:</span>
+            <span class=k>if</span> <span class=p>(</span><span class=ow>not</span> <span class=n>force_no_empty</span><span class=p>)</span> \
+                    <span class=ow>and</span> <span class=p>(</span><span class=n>empty_before</span><span class=p>(</span><span class=n>ltr</span><span class=p>)</span>
+                         <span class=ow>or</span> <span class=p>((</span><span class=n>print_empty</span> <span class=o>></span> <span class=mi>0</span><span class=p>)</span>
+                             <span class=ow>and</span> <span class=p>(</span><span class=n>max_consecutive_empty_lines</span> <span class=o>></span> <span class=mi>0</span><span class=p>))):</span>
+                <span class=n>result</span><span class=o>.</span><span class=n>extend</span><span class=p>([</span><span class=s2>""</span><span class=p>]</span> <span class=o>*</span> <span class=nb>max</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=nb>min</span><span class=p>(</span><span class=n>print_empty</span><span class=p>,</span>
+                                                <span class=n>max_consecutive_empty_lines</span><span class=p>)))</span>
+            <span class=n>no_empty</span> <span class=o>=</span> <span class=n>no_empty_after</span><span class=p>(</span><span class=n>ltr</span><span class=p>)</span>
+            <span class=n>force_no_empty</span> <span class=o>=</span> <span class=n>force_no_empty_after</span><span class=p>(</span><span class=n>ltr</span><span class=p>)</span>
+            <span class=n>result</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>line</span><span class=p>)</span>
+            <span class=n>print_empty</span> <span class=o>=</span> <span class=mi>0</span>
+            <span class=k>continue</span>
+
+        <span class=k>if</span> <span class=n>force_no_empty</span> <span class=ow>or</span> <span class=n>no_empty</span><span class=p>:</span>
+            <span class=k>continue</span>
+
+        <span class=n>print_empty</span> <span class=o>+=</span> <span class=mi>1</span>
+
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>result</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"No lines of text found."</span><span class=p>)</span>
+    <span class=k>return</span> <span class=n>result</span></div>
+
+
+
+<div class=viewcode-block id=strip_common_whitespace_prefix>
+<a class=viewcode-back href=../../../texgit.formatters.html#texgit.formatters.source_tools.strip_common_whitespace_prefix>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>strip_common_whitespace_prefix</span><span class=p>(</span><span class=n>lines</span><span class=p>:</span> <span class=n>Iterable</span><span class=p>[</span><span class=nb>str</span><span class=p>])</span> <span class=o>-></span> <span class=nb>list</span><span class=p>[</span><span class=nb>str</span><span class=p>]:</span>
+<span class=w>    </span><span class=sa>r</span><span class=sd>"""</span>
+<span class=sd>    Strip a common whitespace prefix from a list of strings and merge them.</span>
+
+<span class=sd>    :param lines: the lines</span>
+<span class=sd>    :return: the code with the white space prefix stripped</span>
+
+<span class=sd>    >>> strip_common_whitespace_prefix([" a", "  b"])</span>
+<span class=sd>    ['a', ' b']</span>
+<span class=sd>    >>> strip_common_whitespace_prefix([" a", " b"])</span>
+<span class=sd>    ['a', 'b']</span>
+<span class=sd>    >>> strip_common_whitespace_prefix(["  a", "  b"])</span>
+<span class=sd>    ['a', 'b']</span>
+<span class=sd>    >>> strip_common_whitespace_prefix(["  a", "  b", "c"])</span>
+<span class=sd>    ['  a', '  b', 'c']</span>
+<span class=sd>    >>> strip_common_whitespace_prefix([" a", "  b", "c"])</span>
+<span class=sd>    [' a', '  b', 'c']</span>
+<span class=sd>    >>> strip_common_whitespace_prefix(["  a", "  b", "    c"])</span>
+<span class=sd>    ['a', 'b', '  c']</span>
+<span class=sd>    """</span>
+    <span class=n>prefix_len</span> <span class=o>=</span> <span class=n>sys</span><span class=o>.</span><span class=n>maxsize</span>
+    <span class=k>for</span> <span class=n>line</span> <span class=ow>in</span> <span class=n>lines</span><span class=p>:</span>
+        <span class=n>ll</span> <span class=o>=</span> <span class=nb>len</span><span class=p>(</span><span class=n>line</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>ll</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+            <span class=k>continue</span>
+        <span class=k>for</span> <span class=n>k</span> <span class=ow>in</span> <span class=nb>range</span><span class=p>(</span><span class=nb>min</span><span class=p>(</span><span class=n>ll</span><span class=p>,</span> <span class=n>prefix_len</span><span class=p>)):</span>
+            <span class=k>if</span> <span class=n>line</span><span class=p>[</span><span class=n>k</span><span class=p>]</span> <span class=o>!=</span> <span class=s2>" "</span><span class=p>:</span>
+                <span class=n>prefix_len</span> <span class=o>=</span> <span class=n>k</span>
+                <span class=k>break</span>
+    <span class=k>if</span> <span class=n>prefix_len</span> <span class=o>></span> <span class=mi>0</span><span class=p>:</span>
+        <span class=k>return</span> <span class=p>[</span><span class=n>line</span><span class=p>[</span><span class=n>prefix_len</span><span class=p>:]</span> <span class=k>for</span> <span class=n>line</span> <span class=ow>in</span> <span class=n>lines</span><span class=p>]</span>
+    <span class=k>return</span> <span class=nb>list</span><span class=p>(</span><span class=n>lines</span><span class=p>)</span></div>
+
+</pre></div><div class=clearer></div></div></div></div><div aria-label=Main class=sphinxsidebar role=navigation><div class=sphinxsidebarwrapper><search id=searchbox role=search style=display:none> <h3 id=searchlabel>Quick search</h3> <div class=searchformwrapper><form action=../../../search.html class=search><input aria-labelledby=searchlabel autocapitalize=off autocomplete=off autocorrect=off name=q spellcheck=false><input type=submit value=Go></form></div> </search><script>document.getElementById(`searchbox`).style.display=`block`;</script></div></div><div class=clearer></div></div><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.formatters.source_tools</a></ul></div><div class=footer role=contentinfo>© Copyright 2023-2026, Thomas Weise.</div>

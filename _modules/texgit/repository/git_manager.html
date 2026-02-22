@@ -1,0 +1,183 @@
+<!doctype html><html data-content_root=../../../ lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1.0"name=viewport><title>texgit.repository.git_manager — texgit 0.9.11 documentation</title><link href="../../../_static/pygments.css?v=b86133f3"rel=stylesheet><link href="../../../_static/bizstyle.css?v=5283bb3d"rel=stylesheet><script src="../../../_static/documentation_options.js?v=88b3baf9"></script><script src="../../../_static/doctools.js?v=9bcbadda"></script><script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script><script src=../../../_static/bizstyle.js></script><link href=https://thomasweise.github.io/texgit_py/_modules/texgit/repository/git_manager.html rel=canonical><link href=../../../genindex.html rel=index title=Index><link href=../../../search.html rel=search title=Search><meta content="width=device-width,initial-scale=1.0"name=viewport><body><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"accesskey=I href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a accesskey=U href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.git_manager</a></ul></div><div class=document><div class=documentwrapper><div class=bodywrapper><div class=body role=main><h1>Source code for texgit.repository.git_manager</h1><div class=highlight><pre>
+<span></span><span class=sd>"""</span>
+<span class=sd>A manager for repository repositories.</span>
+
+<span class=sd>This class allows to maintain a local stash of repository repositories that</span>
+<span class=sd>can consistently be accessed without loading any repository multiple</span>
+<span class=sd>times.</span>
+<span class=sd>"""</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>dataclasses</span><span class=w> </span><span class=kn>import</span> <span class=n>dataclass</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>os</span><span class=w> </span><span class=kn>import</span> <span class=n>rmdir</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>typing</span><span class=w> </span><span class=kn>import</span> <span class=n>Final</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.path</span><span class=w> </span><span class=kn>import</span> <span class=n>Path</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.net.url</span><span class=w> </span><span class=kn>import</span> <span class=n>URL</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.types</span><span class=w> </span><span class=kn>import</span> <span class=n>type_error</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>texgit.repository.file_manager</span><span class=w> </span><span class=kn>import</span> <span class=n>FileManager</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>texgit.repository.git</span><span class=w> </span><span class=kn>import</span> <span class=n>GitRepository</span>
+
+
+<div class=viewcode-block id=GitPath>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git_manager.GitPath>[docs]</a>
+<span class=nd>@dataclass</span><span class=p>(</span><span class=n>frozen</span><span class=o>=</span><span class=kc>True</span><span class=p>,</span> <span class=n>init</span><span class=o>=</span><span class=kc>False</span><span class=p>,</span> <span class=n>order</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+<span class=k>class</span><span class=w> </span><span class=nc>GitPath</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""An immutable record of a path inside a git repository."""</span>
+
+    <span class=c1>#: the absolute path of the file or directory inside the repository</span>
+    <span class=c1>#: directory</span>
+    <span class=n>path</span><span class=p>:</span> <span class=n>Path</span>
+    <span class=c1>#: the base name of the file</span>
+    <span class=n>basename</span><span class=p>:</span> <span class=nb>str</span>
+    <span class=c1>#: the repository</span>
+    <span class=n>repo</span><span class=p>:</span> <span class=n>GitRepository</span>
+    <span class=c1>#: the URL</span>
+    <span class=n>url</span><span class=p>:</span> <span class=n>URL</span>
+
+    <span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>path</span><span class=p>:</span> <span class=n>Path</span><span class=p>,</span> <span class=n>repo</span><span class=p>:</span> <span class=n>GitRepository</span><span class=p>,</span> <span class=n>url</span><span class=p>:</span> <span class=n>URL</span><span class=p>,</span>
+                 <span class=n>basename</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>):</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Set up the information about a repository.</span>
+
+<span class=sd>        :param path: the absolute path to the file or directory</span>
+<span class=sd>        :param repo: the repository</span>
+<span class=sd>        """</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>path</span><span class=p>,</span> <span class=n>Path</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>path</span><span class=p>,</span> <span class=s2>"path_in_repo"</span><span class=p>,</span> <span class=n>Path</span><span class=p>)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>repo</span><span class=p>,</span> <span class=n>GitRepository</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>repo</span><span class=p>,</span> <span class=s2>"repo"</span><span class=p>,</span> <span class=n>GitRepository</span><span class=p>)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>url</span><span class=p>,</span> <span class=n>URL</span><span class=p>):</span>
+            <span class=k>raise</span> <span class=n>type_error</span><span class=p>(</span><span class=n>url</span><span class=p>,</span> <span class=s2>"url"</span><span class=p>,</span> <span class=n>URL</span><span class=p>)</span>
+        <span class=n>basename</span> <span class=o>=</span> <span class=n>path</span><span class=o>.</span><span class=n>basename</span><span class=p>()</span> <span class=k>if</span> <span class=n>basename</span> <span class=ow>is</span> <span class=kc>None</span> \
+            <span class=k>else</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>basename</span><span class=p>)</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"path"</span><span class=p>,</span> <span class=n>path</span><span class=p>)</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"repo"</span><span class=p>,</span> <span class=n>repo</span><span class=p>)</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"url"</span><span class=p>,</span> <span class=n>url</span><span class=p>)</span>
+        <span class=nb>object</span><span class=o>.</span><span class=fm>__setattr__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>"basename"</span><span class=p>,</span> <span class=n>basename</span><span class=p>)</span></div>
+
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>_make_key</span><span class=p>(</span><span class=n>u</span><span class=p>:</span> <span class=n>URL</span><span class=p>)</span> <span class=o>-></span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>]:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Turn a URL into a key.</span>
+
+<span class=sd>    :param u: the url</span>
+<span class=sd>    :return: the key</span>
+<span class=sd>    """</span>
+    <span class=n>pt</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=n>u</span><span class=o>.</span><span class=n>path</span>
+    <span class=k>while</span> <span class=n>pt</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=s2>"/"</span><span class=p>):</span>
+        <span class=n>pt</span> <span class=o>=</span> <span class=n>pt</span><span class=p>[</span><span class=mi>1</span><span class=p>:]</span>
+    <span class=k>while</span> <span class=n>pt</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=s2>".git"</span><span class=p>):</span>
+        <span class=n>pt</span> <span class=o>=</span> <span class=n>pt</span><span class=p>[:</span><span class=o>-</span><span class=mi>4</span><span class=p>]</span>
+    <span class=k>while</span> <span class=n>pt</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=s2>"/"</span><span class=p>):</span>
+        <span class=n>pt</span> <span class=o>=</span> <span class=n>pt</span><span class=p>[:</span><span class=o>-</span><span class=mi>1</span><span class=p>]</span>
+    <span class=n>pt</span> <span class=o>=</span> <span class=n>pt</span><span class=o>.</span><span class=n>replace</span><span class=p>(</span><span class=s2>"/"</span><span class=p>,</span> <span class=s2>"_"</span><span class=p>)</span>
+    <span class=k>return</span> <span class=s2>"gh"</span> <span class=k>if</span> <span class=n>u</span><span class=o>.</span><span class=n>host</span><span class=o>.</span><span class=n>lower</span><span class=p>()</span> <span class=o>==</span> <span class=s2>"github.com"</span> <span class=k>else</span> <span class=n>u</span><span class=o>.</span><span class=n>host</span><span class=p>,</span> <span class=n>pt</span>
+
+
+<div class=viewcode-block id=GitManager>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git_manager.GitManager>[docs]</a>
+<span class=k>class</span><span class=w> </span><span class=nc>GitManager</span><span class=p>(</span><span class=n>FileManager</span><span class=p>):</span>
+<span class=w>    </span><span class=sd>"""A git repository manager can provide a set of git repositories."""</span>
+
+    <span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>base_dir</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Set up the git repository manager.</span>
+
+<span class=sd>        :param base_dir: the base directory</span>
+<span class=sd>        """</span>
+        <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=fm>__init__</span><span class=p>(</span><span class=n>base_dir</span><span class=p>)</span>
+        <span class=c1>#: the internal set of github repositories</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__repos</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>dict</span><span class=p>[</span><span class=nb>tuple</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>],</span> <span class=n>GitRepository</span><span class=p>]]</span> <span class=o>=</span> <span class=p>{}</span>
+
+        <span class=c1>#: load all the repository repositories</span>
+        <span class=k>for</span> <span class=n>the_dir</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>list_realm</span><span class=p>(</span><span class=s2>"git"</span><span class=p>,</span> <span class=n>files</span><span class=o>=</span><span class=kc>False</span><span class=p>,</span> <span class=n>directories</span><span class=o>=</span><span class=kc>True</span><span class=p>):</span>
+            <span class=k>if</span> <span class=n>the_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=s2>".git"</span><span class=p>)</span><span class=o>.</span><span class=n>is_dir</span><span class=p>():</span>
+                <span class=n>gr</span><span class=p>:</span> <span class=n>GitRepository</span> <span class=o>=</span> <span class=n>GitRepository</span><span class=o>.</span><span class=n>from_local</span><span class=p>(</span><span class=n>the_dir</span><span class=p>)</span>
+                <span class=bp>self</span><span class=o>.</span><span class=n>__repos</span><span class=p>[</span><span class=n>_make_key</span><span class=p>(</span><span class=n>gr</span><span class=o>.</span><span class=n>url</span><span class=p>)]</span> <span class=o>=</span> <span class=n>gr</span>
+
+    <span class=k>def</span><span class=w> </span><span class=nf>_get_sensitive_paths</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-></span> <span class=nb>list</span><span class=p>[</span><span class=n>Path</span><span class=p>]:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get the list of sensitive paths.</span>
+
+<span class=sd>        :return: the paths</span>
+<span class=sd>        """</span>
+        <span class=n>paths</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>list</span><span class=p>[</span><span class=n>Path</span><span class=p>]]</span> <span class=o>=</span> <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=n>_get_sensitive_paths</span><span class=p>()</span>
+        <span class=n>paths</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=n>r</span><span class=o>.</span><span class=n>path</span> <span class=k>for</span> <span class=n>r</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>__repos</span><span class=o>.</span><span class=n>values</span><span class=p>())</span>
+        <span class=k>return</span> <span class=n>paths</span>
+
+<div class=viewcode-block id=GitManager.get_repository>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git_manager.GitManager.get_repository>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_repository</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>url</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=n>GitRepository</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get the git repository for the given URL.</span>
+
+<span class=sd>        :param url: the URL to load</span>
+<span class=sd>        :return: the repository</span>
+<span class=sd>        """</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>_check_open</span><span class=p>()</span>
+        <span class=n>use_url</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>URL</span><span class=p>]</span> <span class=o>=</span> <span class=n>URL</span><span class=p>(</span><span class=n>url</span><span class=p>)</span>
+        <span class=n>key</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>tuple</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>]]</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>use_url</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>key</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>__repos</span><span class=p>:</span>
+            <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>__repos</span><span class=p>[</span><span class=n>key</span><span class=p>]</span>
+        <span class=n>name</span><span class=p>:</span> <span class=nb>str</span> <span class=o>=</span> <span class=s2>"_"</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>key</span><span class=p>)</span>
+        <span class=n>dirpath</span><span class=p>,</span> <span class=n>found</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_dir</span><span class=p>(</span><span class=s2>"git"</span><span class=p>,</span> <span class=n>name</span><span class=p>)</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=n>found</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"Inconsistent archive state!"</span><span class=p>)</span>
+        <span class=k>try</span><span class=p>:</span>
+            <span class=n>gt</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>GitRepository</span><span class=p>]</span> <span class=o>=</span> <span class=n>GitRepository</span><span class=o>.</span><span class=n>download</span><span class=p>(</span><span class=n>use_url</span><span class=p>,</span> <span class=n>dirpath</span><span class=p>)</span>
+        <span class=k>except</span> <span class=ne>ValueError</span><span class=p>:</span>
+            <span class=n>rmdir</span><span class=p>(</span><span class=n>dirpath</span><span class=p>)</span>
+            <span class=k>raise</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__repos</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>gt</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__repos</span><span class=p>[</span><span class=n>_make_key</span><span class=p>(</span><span class=n>gt</span><span class=o>.</span><span class=n>url</span><span class=p>)]</span> <span class=o>=</span> <span class=n>gt</span>
+        <span class=k>return</span> <span class=n>gt</span></div>
+
+
+    <span class=k>def</span><span class=w> </span><span class=nf>__get_git</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>repo_url</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>relative_path</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span>
+                  <span class=n>is_file</span><span class=p>:</span> <span class=nb>bool</span><span class=p>)</span> <span class=o>-></span> <span class=n>GitPath</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get a file or directory from the given repository.</span>
+
+<span class=sd>        :param repo_url: the repository URL</span>
+<span class=sd>        :param relative_path: the relative path to the file or directory</span>
+<span class=sd>        :param is_file: should it be a file (`True`) or directory (`False`)</span>
+<span class=sd>        :return: the path and the URL</span>
+<span class=sd>        """</span>
+        <span class=n>relative_path</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>relative_path</span><span class=p>)</span>
+        <span class=n>repo</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>GitRepository</span><span class=p>]</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>get_repository</span><span class=p>(</span><span class=n>repo_url</span><span class=p>)</span>
+        <span class=n>dest</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>repo</span><span class=o>.</span><span class=n>path</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=n>relative_path</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>is_file</span><span class=p>:</span>
+            <span class=n>dest</span><span class=o>.</span><span class=n>enforce_file</span><span class=p>()</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>dest</span><span class=o>.</span><span class=n>enforce_dir</span><span class=p>()</span>
+        <span class=k>return</span> <span class=n>GitPath</span><span class=p>(</span><span class=n>dest</span><span class=p>,</span> <span class=n>repo</span><span class=p>,</span> <span class=n>repo</span><span class=o>.</span><span class=n>make_url</span><span class=p>(</span><span class=n>dest</span><span class=p>))</span>
+
+<div class=viewcode-block id=GitManager.get_git_file>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git_manager.GitManager.get_git_file>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_git_file</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>repo_url</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>relative_file</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=n>GitPath</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get a path to a file from the given git repository and also the URL.</span>
+
+<span class=sd>        :param repo_url: the repository url.</span>
+<span class=sd>        :param relative_file: the relative path</span>
+<span class=sd>        :return: a tuple of file and URL</span>
+<span class=sd>        """</span>
+        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get_git</span><span class=p>(</span><span class=n>repo_url</span><span class=p>,</span> <span class=n>relative_file</span><span class=p>,</span> <span class=kc>True</span><span class=p>)</span></div>
+
+
+<div class=viewcode-block id=GitManager.get_git_dir>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.git_manager.GitManager.get_git_dir>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_git_dir</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>repo_url</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>relative_dir</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=n>GitPath</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get a path to a directory from the given git repository.</span>
+
+<span class=sd>        :param repo_url: the repository url.</span>
+<span class=sd>        :param relative_dir: the relative path</span>
+<span class=sd>        :return: a tuple of directory and URL</span>
+<span class=sd>        """</span>
+        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get_git</span><span class=p>(</span><span class=n>repo_url</span><span class=p>,</span> <span class=n>relative_dir</span><span class=p>,</span> <span class=kc>False</span><span class=p>)</span></div>
+</div>
+
+</pre></div><div class=clearer></div></div></div></div><div aria-label=Main class=sphinxsidebar role=navigation><div class=sphinxsidebarwrapper><search id=searchbox role=search style=display:none> <h3 id=searchlabel>Quick search</h3> <div class=searchformwrapper><form action=../../../search.html class=search><input aria-labelledby=searchlabel autocapitalize=off autocomplete=off autocorrect=off name=q spellcheck=false><input type=submit value=Go></form></div> </search><script>document.getElementById(`searchbox`).style.display=`block`;</script></div></div><div class=clearer></div></div><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.git_manager</a></ul></div><div class=footer role=contentinfo>© Copyright 2023-2026, Thomas Weise.</div>

@@ -1,0 +1,99 @@
+<!doctype html><html data-content_root=../../../ lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1.0"name=viewport><title>texgit.repository.fix_path — texgit 0.9.11 documentation</title><link href="../../../_static/pygments.css?v=b86133f3"rel=stylesheet><link href="../../../_static/bizstyle.css?v=5283bb3d"rel=stylesheet><script src="../../../_static/documentation_options.js?v=88b3baf9"></script><script src="../../../_static/doctools.js?v=9bcbadda"></script><script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script><script src=../../../_static/bizstyle.js></script><link href=https://thomasweise.github.io/texgit_py/_modules/texgit/repository/fix_path.html rel=canonical><link href=../../../genindex.html rel=index title=Index><link href=../../../search.html rel=search title=Search><meta content="width=device-width,initial-scale=1.0"name=viewport><body><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"accesskey=I href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a accesskey=U href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.fix_path</a></ul></div><div class=document><div class=documentwrapper><div class=bodywrapper><div class=body role=main><h1>Source code for texgit.repository.fix_path</h1><div class=highlight><pre>
+<span></span><span class=sd>"""A tool for fixing all occurrences of a Path."""</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>contextlib</span><span class=w> </span><span class=kn>import</span> <span class=n>suppress</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>itertools</span><span class=w> </span><span class=kn>import</span> <span class=n>chain</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>os</span><span class=w> </span><span class=kn>import</span> <span class=n>sep</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>re</span><span class=w> </span><span class=kn>import</span> <span class=n>MULTILINE</span><span class=p>,</span> <span class=n>Match</span><span class=p>,</span> <span class=n>escape</span><span class=p>,</span> <span class=n>sub</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>typing</span><span class=w> </span><span class=kn>import</span> <span class=n>Final</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.path</span><span class=w> </span><span class=kn>import</span> <span class=n>Path</span>
+
+<span class=c1>#: the replacement string for base paths</span>
+<span class=n>BASE_PATH_REPLACEMENT</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=s2>"{...}"</span>
+
+<span class=c1>#: the literal string start and ends.</span>
+<span class=n>__SE</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>tuple</span><span class=p>[</span><span class=nb>tuple</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>str</span><span class=p>],</span> <span class=o>...</span><span class=p>]]</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(</span><span class=nb>sorted</span><span class=p>(</span><span class=n>chain</span><span class=p>(</span>
+    <span class=p>((</span><span class=n>escape</span><span class=p>(</span><span class=n>strs</span><span class=p>),</span> <span class=n>escape</span><span class=p>(</span><span class=n>stre</span><span class=p>))</span> <span class=k>for</span> <span class=n>strs</span><span class=p>,</span> <span class=n>stre</span> <span class=ow>in</span> <span class=p>(</span>
+        <span class=p>(</span><span class=s2>" "</span><span class=p>,</span> <span class=s2>" "</span><span class=p>),</span> <span class=p>(</span><span class=s2>"'"</span><span class=p>,</span> <span class=s2>"'"</span><span class=p>),</span> <span class=p>(</span><span class=s2>"("</span><span class=p>,</span> <span class=s2>")"</span><span class=p>),</span> <span class=p>(</span><span class=s2>"{"</span><span class=p>,</span> <span class=s2>"}"</span><span class=p>),</span> <span class=p>(</span><span class=s2>"["</span><span class=p>,</span> <span class=s2>"]"</span><span class=p>),</span>
+        <span class=p>(</span><span class=s2>"<"</span><span class=p>,</span> <span class=s2>">"</span><span class=p>),</span> <span class=p>(</span><span class=s2>"`"</span><span class=p>,</span> <span class=s2>"`"</span><span class=p>),</span> <span class=p>(</span><span class=s2>","</span><span class=p>,</span> <span class=s2>" "</span><span class=p>),</span> <span class=p>(</span><span class=s2>","</span><span class=p>,</span> <span class=s2>","</span><span class=p>),</span> <span class=p>(</span><span class=s1>'"'</span><span class=p>,</span> <span class=s1>'"'</span><span class=p>),</span>
+        <span class=p>(</span><span class=s2>";"</span><span class=p>,</span> <span class=s2>" "</span><span class=p>),</span> <span class=p>(</span><span class=s2>";"</span><span class=p>,</span> <span class=s2>";"</span><span class=p>),</span> <span class=p>(</span><span class=s2>" "</span><span class=p>,</span> <span class=s2>". "</span><span class=p>))),</span>
+    <span class=p>((</span><span class=s2>"^"</span><span class=p>,</span> <span class=s2>"$"</span><span class=p>),</span> <span class=p>(</span><span class=s2>"^"</span><span class=p>,</span> <span class=s2>" "</span><span class=p>),</span> <span class=p>(</span><span class=s2>" "</span><span class=p>,</span> <span class=s2>"$"</span><span class=p>),</span> <span class=p>(</span><span class=s2>"^"</span><span class=p>,</span> <span class=s2>","</span><span class=p>),</span> <span class=p>(</span><span class=s2>","</span><span class=p>,</span> <span class=s2>"$"</span><span class=p>),</span>
+     <span class=p>(</span><span class=s2>"^"</span><span class=p>,</span> <span class=s2>";"</span><span class=p>),</span> <span class=p>(</span><span class=s2>";"</span><span class=p>,</span> <span class=s2>"$"</span><span class=p>),</span> <span class=p>(</span><span class=s2>"^"</span><span class=p>,</span> <span class=n>escape</span><span class=p>(</span><span class=s2>". "</span><span class=p>)),</span>
+     <span class=p>(</span><span class=s2>"^"</span><span class=p>,</span> <span class=n>escape</span><span class=p>(</span><span class=s2>"."</span><span class=p>)</span> <span class=o>+</span> <span class=s2>"$"</span><span class=p>))),</span>
+<span class=p>))</span>
+
+
+<div class=viewcode-block id=replace_base_path>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.fix_path.replace_base_path>[docs]</a>
+<span class=k>def</span><span class=w> </span><span class=nf>replace_base_path</span><span class=p>(</span><span class=n>orig</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>base_path</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=nb>str</span><span class=p>:</span>
+<span class=w>    </span><span class=sa>r</span><span class=sd>"""</span>
+<span class=sd>    Replace all occurrences of the `base_path` in the original string.</span>
+
+<span class=sd>    Any reasonably delimited occurrence of `base_path` as well as any sub-path</span>
+<span class=sd>    under `base_path` that points to an existing file or directory are</span>
+<span class=sd>    replaced with relativizations starting with `{...}`.</span>
+
+<span class=sd>    :param orig: the original string</span>
+<span class=sd>    :param base_path: the base path</span>
+<span class=sd>    :return: the fixed string</span>
+
+<span class=sd>    >>> from pycommons.io.temp import temp_dir</span>
+<span class=sd>    >>> with temp_dir() as td:</span>
+<span class=sd>    ...     td.resolve_inside("x").ensure_dir_exists()</span>
+<span class=sd>    ...     td.resolve_inside("x/y").write_all_str("5")</span>
+<span class=sd>    ...     a = replace_base_path(f"blablabla {td}/x ", td)</span>
+<span class=sd>    ...     b = replace_base_path(f"{td}/x/y", td)</span>
+<span class=sd>    ...     c = replace_base_path(f"{td}/x.", td)</span>
+<span class=sd>    ...     d = replace_base_path("\n".join(("blaa", f"{td}/x.x", "y")), td)</span>
+<span class=sd>    ...     e = replace_base_path("\n".join(("blaa", f"{td}/x.", "y")), td)</span>
+<span class=sd>    ...     f = replace_base_path(f"xc'{td}/x/y'yy", td)</span>
+<span class=sd>    ...     g = replace_base_path(td, td)</span>
+<span class=sd>    ...     h = replace_base_path(td + "/", td)</span>
+<span class=sd>    >>> a</span>
+<span class=sd>    'blablabla {...}/x '</span>
+
+<span class=sd>    >>> b</span>
+<span class=sd>    '{...}/x/y'</span>
+
+<span class=sd>    >>> c</span>
+<span class=sd>    '{...}/x.'</span>
+
+<span class=sd>    >>> d[-6:]</span>
+<span class=sd>    '/x.x\ny'</span>
+
+<span class=sd>    >>> e</span>
+<span class=sd>    'blaa\n{...}/x.\ny'</span>
+
+<span class=sd>    >>> f</span>
+<span class=sd>    "xc'{...}/x/y'yy"</span>
+
+<span class=sd>    >>> g</span>
+<span class=sd>    '{...}'</span>
+
+<span class=sd>    >>> h</span>
+<span class=sd>    '{...}/'</span>
+<span class=sd>    """</span>
+    <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>orig</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+        <span class=k>return</span> <span class=s2>""</span>
+    <span class=n>path</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=n>base_path</span><span class=p>)</span>
+    <span class=n>path_re</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>escape</span><span class=p>(</span><span class=n>path</span><span class=p>)</span>
+
+    <span class=k>def</span><span class=w> </span><span class=nf>__replacer</span><span class=p>(</span><span class=n>data</span><span class=p>:</span> <span class=n>Match</span><span class=p>,</span> <span class=n>__bp</span><span class=p>:</span> <span class=n>Path</span> <span class=o>=</span> <span class=n>path</span><span class=p>)</span> <span class=o>-></span> <span class=nb>str</span><span class=p>:</span>
+        <span class=n>prefix</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>data</span><span class=o>.</span><span class=n>group</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span>
+        <span class=n>subpath</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>data</span><span class=o>.</span><span class=n>group</span><span class=p>(</span><span class=mi>2</span><span class=p>)</span>
+        <span class=n>suffix</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>data</span><span class=o>.</span><span class=n>group</span><span class=p>(</span><span class=mi>3</span><span class=p>)</span>
+        <span class=k>with</span> <span class=n>suppress</span><span class=p>(</span><span class=ne>ValueError</span><span class=p>):</span>
+            <span class=n>usesubpath</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>subpath</span><span class=p>[</span><span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>sep</span><span class=p>):]</span> \
+                <span class=k>if</span> <span class=n>subpath</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=n>sep</span><span class=p>)</span> <span class=k>else</span> <span class=n>subpath</span>
+            <span class=k>if</span> <span class=p>(</span><span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>usesubpath</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>)</span> \
+                    <span class=ow>or</span> <span class=n>__bp</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=n>usesubpath</span><span class=p>)</span><span class=o>.</span><span class=n>exists</span><span class=p>():</span>
+                <span class=k>return</span> <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>prefix</span><span class=si>}</span><span class=se>{{</span><span class=s2>...</span><span class=se>}}</span><span class=si>{</span><span class=n>subpath</span><span class=si>}{</span><span class=n>suffix</span><span class=si>}</span><span class=s2>"</span>
+        <span class=k>return</span> <span class=n>data</span><span class=o>.</span><span class=n>group</span><span class=p>(</span><span class=mi>0</span><span class=p>)</span>
+
+    <span class=k>for</span> <span class=n>start</span><span class=p>,</span> <span class=n>end</span> <span class=ow>in</span> <span class=n>__SE</span><span class=p>:</span>
+        <span class=n>orig</span> <span class=o>=</span> <span class=n>sub</span><span class=p>(</span><span class=sa>f</span><span class=s2>"(</span><span class=si>{</span><span class=n>start</span><span class=si>}</span><span class=s2>)</span><span class=si>{</span><span class=n>path_re</span><span class=si>}</span><span class=s2>(.*?)(</span><span class=si>{</span><span class=n>end</span><span class=si>}</span><span class=s2>)"</span><span class=p>,</span> <span class=n>__replacer</span><span class=p>,</span> <span class=n>orig</span><span class=p>,</span>
+                   <span class=n>flags</span><span class=o>=</span><span class=n>MULTILINE</span><span class=p>)</span>
+    <span class=k>return</span> <span class=n>orig</span></div>
+
+</pre></div><div class=clearer></div></div></div></div><div aria-label=Main class=sphinxsidebar role=navigation><div class=sphinxsidebarwrapper><search id=searchbox role=search style=display:none> <h3 id=searchlabel>Quick search</h3> <div class=searchformwrapper><form action=../../../search.html class=search><input aria-labelledby=searchlabel autocapitalize=off autocomplete=off autocorrect=off name=q spellcheck=false><input type=submit value=Go></form></div> </search><script>document.getElementById(`searchbox`).style.display=`block`;</script></div></div><div class=clearer></div></div><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.fix_path</a></ul></div><div class=footer role=contentinfo>© Copyright 2023-2026, Thomas Weise.</div>

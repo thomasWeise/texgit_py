@@ -1,0 +1,317 @@
+<!doctype html><html data-content_root=../../../ lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1.0"name=viewport><title>texgit.repository.file_manager — texgit 0.9.11 documentation</title><link href="../../../_static/pygments.css?v=b86133f3"rel=stylesheet><link href="../../../_static/bizstyle.css?v=5283bb3d"rel=stylesheet><script src="../../../_static/documentation_options.js?v=88b3baf9"></script><script src="../../../_static/doctools.js?v=9bcbadda"></script><script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script><script src=../../../_static/bizstyle.js></script><link href=https://thomasweise.github.io/texgit_py/_modules/texgit/repository/file_manager.html rel=canonical><link href=../../../genindex.html rel=index title=Index><link href=../../../search.html rel=search title=Search><meta content="width=device-width,initial-scale=1.0"name=viewport><body><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"accesskey=I href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a accesskey=U href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.file_manager</a></ul></div><div class=document><div class=documentwrapper><div class=bodywrapper><div class=body role=main><h1>Source code for texgit.repository.file_manager</h1><div class=highlight><pre>
+<span></span><span class=sd>"""</span>
+<span class=sd>A class for managing files and directories.</span>
+
+<span class=sd>A :class:`~texgit.repository.file_manager.FileManager` provides a two-level</span>
+<span class=sd>abstraction for assigning paths to unique IDs.</span>
+<span class=sd>An ID is a combination of a "realm" and a "name", both of which are non-empty</span>
+<span class=sd>strings without whitespace.</span>
+
+<span class=sd>A file manager resides within a certain base directory.</span>
+<span class=sd>Inside the base directory, it provides so-called "realms".</span>
+<span class=sd>Each realm is a separate namespace.</span>
+<span class=sd>With a realm, "names" are mapped to paths.</span>
+<span class=sd>The file manager ensures that the same realm-name combination is always</span>
+<span class=sd>assigned to the same path.</span>
+<span class=sd>The first time such a combination is queried, the path is created.</span>
+<span class=sd>This path can be a file or a directory, depending on what was queried.</span>
+<span class=sd>Every realm-name combination always uniquely identifies a path and there can</span>
+<span class=sd>never be another realm-name combination pointing to the same path.</span>
+<span class=sd>If need be, the paths are randomized to avoid potential clashes.</span>
+
+<span class=sd>Once the file manager is closed, the realm-name to path associations are</span>
+<span class=sd>stored.</span>
+<span class=sd>When a new file manager instance is created for the same base directory, the</span>
+<span class=sd>associations of realms-names to paths are restored.</span>
+<span class=sd>This means that a program that creates output files for certain commands can</span>
+<span class=sd>then find these files again later.</span>
+
+<span class=sd>:class:`~texgit.repository.git_manager.GitManager` is the base and root of</span>
+<span class=sd>the functionality of a managed repository of files and data.</span>
+<span class=sd>Step-by-step, functionality is added to the manager by derived classes.</span>
+<span class=sd>We do this iteratively:</span>
+
+<span class=sd>:class:`~texgit.repository.git_manager.GitManager` adds the capability to</span>
+<span class=sd>automatically download and use `git` repositories. For this purpose, it uses</span>
+<span class=sd>the realm `git`.</span>
+
+<span class=sd>:class:`~texgit.repository.process_manager.ProcessManager` adds the ability</span>
+<span class=sd>to execute programs or scripts and to store their output in files to the</span>
+<span class=sd>:class:`~texgit.repository.git_manager.GitManager`.</span>
+<span class=sd>These programs and scripts may be located in `git` repositories that have</span>
+<span class=sd>automatically been downloaded.</span>
+<span class=sd>"""</span>
+<span class=kn>import</span><span class=w> </span><span class=nn>json</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>contextlib</span><span class=w> </span><span class=kn>import</span> <span class=n>AbstractContextManager</span><span class=p>,</span> <span class=n>suppress</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>os</span><span class=w> </span><span class=kn>import</span> <span class=n>close</span> <span class=k>as</span> <span class=n>os_close</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>os</span><span class=w> </span><span class=kn>import</span> <span class=n>remove</span> <span class=k>as</span> <span class=n>os_remove</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>tempfile</span><span class=w> </span><span class=kn>import</span> <span class=n>mkstemp</span>
+<span class=kn>from</span><span class=w> </span><span class=nn>typing</span><span class=w> </span><span class=kn>import</span> <span class=n>Callable</span><span class=p>,</span> <span class=n>Final</span>
+
+<span class=kn>from</span><span class=w> </span><span class=nn>pycommons.io.path</span><span class=w> </span><span class=kn>import</span> <span class=n>Path</span>
+
+<span class=n>__OK_CHARS</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=p>(</span><span class=s2>"abcdefghijklmnopqrstuvwxyz"</span>
+                          <span class=s2>"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>
+                          <span class=s2>"0123456789+-_"</span><span class=p>)</span>
+
+<span class=c1>#: the characters that are OK for a file name</span>
+<span class=n>_FILENAME_OK</span><span class=p>:</span> <span class=n>Callable</span><span class=p>[[</span><span class=nb>str</span><span class=p>],</span> <span class=nb>bool</span><span class=p>]</span> <span class=o>=</span> <span class=nb>set</span><span class=p>(</span><span class=n>__OK_CHARS</span><span class=p>)</span><span class=o>.</span><span class=fm>__contains__</span>
+
+<span class=c1>#: characters allowed in a key</span>
+<span class=n>__KEY_ALLOWED</span><span class=p>:</span> <span class=n>Callable</span><span class=p>[[</span><span class=nb>str</span><span class=p>],</span> <span class=nb>bool</span><span class=p>]</span> <span class=o>=</span> <span class=p>(</span>
+    <span class=nb>set</span><span class=p>(</span><span class=n>__OK_CHARS</span><span class=p>)</span><span class=o>.</span><span class=n>union</span><span class=p>(</span><span class=s2>":.@/"</span><span class=p>)</span><span class=o>.</span><span class=fm>__contains__</span><span class=p>)</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>_make_key</span><span class=p>(</span><span class=n>s</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=nb>str</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Create a compliant key.</span>
+
+<span class=sd>    :param s: the string</span>
+<span class=sd>    :return: the key</span>
+<span class=sd>    """</span>
+    <span class=n>s</span> <span class=o>=</span> <span class=nb>str</span><span class=o>.</span><span class=n>strip</span><span class=p>(</span><span class=n>s</span><span class=p>)</span>
+    <span class=k>if</span> <span class=nb>str</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>s</span><span class=p>)</span> <span class=o><=</span> <span class=mi>0</span><span class=p>:</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"Non-empty str expected, but got empty string "</span>
+                         <span class=s2>"or string of only white space."</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=nb>all</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=n>__KEY_ALLOWED</span><span class=p>,</span> <span class=n>s</span><span class=p>)):</span>
+        <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"String contains forbidden character."</span><span class=p>)</span>
+    <span class=k>return</span> <span class=n>s</span>
+
+
+<span class=k>def</span><span class=w> </span><span class=nf>_make_ignore</span><span class=p>(</span><span class=n>path</span><span class=p>:</span> <span class=n>Path</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>"""</span>
+<span class=sd>    Create a `.gitignore` file in the given path.</span>
+
+<span class=sd>    :param path: the path</span>
+<span class=sd>    """</span>
+    <span class=n>file</span><span class=p>:</span> <span class=n>Path</span> <span class=o>=</span> <span class=n>path</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=s2>".gitignore"</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>file</span><span class=o>.</span><span class=n>exists</span><span class=p>():</span>
+        <span class=n>file</span><span class=o>.</span><span class=n>write_all_str</span><span class=p>(</span><span class=s2>"*</span><span class=se>\n</span><span class=s2>**/*"</span><span class=p>)</span>
+    <span class=n>file</span> <span class=o>=</span> <span class=n>path</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=s2>".nojekyll"</span><span class=p>)</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>file</span><span class=o>.</span><span class=n>exists</span><span class=p>():</span>
+        <span class=n>file</span><span class=o>.</span><span class=n>ensure_file_exists</span><span class=p>()</span>
+
+
+<div class=viewcode-block id=FileManager>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.file_manager.FileManager>[docs]</a>
+<span class=k>class</span><span class=w> </span><span class=nc>FileManager</span><span class=p>(</span><span class=n>AbstractContextManager</span><span class=p>):</span>
+<span class=w>    </span><span class=sd>"""A manager for files."""</span>
+
+    <span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>base_dir</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Set up the git repository manager.</span>
+
+<span class=sd>        :param base_dir: the base directory</span>
+<span class=sd>        """</span>
+        <span class=c1>#: the base directory of the repository manager</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__base_dir</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=n>base_dir</span><span class=p>)</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__base_dir</span><span class=o>.</span><span class=n>ensure_dir_exists</span><span class=p>()</span>
+        <span class=n>_make_ignore</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>__base_dir</span><span class=p>)</span>
+
+        <span class=c1>#: the directory with the realms</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__realms_dir</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__base_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span>
+            <span class=s2>"realms"</span><span class=p>)</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__realms_dir</span><span class=o>.</span><span class=n>ensure_dir_exists</span><span class=p>()</span>
+        <span class=n>_make_ignore</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>__realms_dir</span><span class=p>)</span>
+
+        <span class=c1>#: the internal cache file</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__cache_file</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=n>Path</span><span class=p>]</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__base_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span>
+            <span class=s2>".cache.json"</span><span class=p>)</span>
+        <span class=c1>#: we are open</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__is_open</span> <span class=o>=</span> <span class=kc>True</span>
+
+        <span class=c1>#: the dictionary of realms and IDs</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Path</span><span class=p>,</span> <span class=nb>dict</span><span class=p>[</span><span class=nb>str</span><span class=p>,</span> <span class=n>Path</span><span class=p>]]]]</span> <span class=o>=</span> <span class=p>{}</span>
+
+        <span class=c1>#: load the cache</span>
+        <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>__cache_file</span><span class=o>.</span><span class=n>exists</span><span class=p>():</span>
+            <span class=bp>self</span><span class=o>.</span><span class=n>__cache_file</span><span class=o>.</span><span class=n>enforce_file</span><span class=p>()</span>
+            <span class=k>for</span> <span class=n>key</span><span class=p>,</span> <span class=n>values</span> <span class=ow>in</span> <span class=n>json</span><span class=o>.</span><span class=n>loads</span><span class=p>(</span>
+                    <span class=bp>self</span><span class=o>.</span><span class=n>__cache_file</span><span class=o>.</span><span class=n>read_all_str</span><span class=p>())</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
+                <span class=n>realm</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>key</span><span class=p>)</span>
+                <span class=n>realm_dir</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__realms_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=n>realm</span><span class=p>)</span>
+                <span class=n>realm_map</span> <span class=o>=</span> <span class=p>{}</span>
+                <span class=k>for</span> <span class=n>name</span><span class=p>,</span> <span class=n>path</span> <span class=ow>in</span> <span class=n>values</span><span class=o>.</span><span class=n>items</span><span class=p>():</span>
+                    <span class=n>use_name</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>name</span><span class=p>)</span>
+                    <span class=n>use_path</span> <span class=o>=</span> <span class=n>realm_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=n>path</span><span class=p>)</span>
+                    <span class=k>if</span> <span class=n>use_path</span><span class=o>.</span><span class=n>exists</span><span class=p>()</span> <span class=ow>and</span> <span class=p>(</span>
+                            <span class=n>use_path</span><span class=o>.</span><span class=n>is_file</span><span class=p>()</span> <span class=ow>or</span> <span class=n>use_path</span><span class=o>.</span><span class=n>is_dir</span><span class=p>()):</span>
+                        <span class=n>realm_map</span><span class=p>[</span><span class=n>use_name</span><span class=p>]</span> <span class=o>=</span> <span class=n>use_path</span>
+                <span class=k>if</span> <span class=nb>dict</span><span class=o>.</span><span class=fm>__len__</span><span class=p>(</span><span class=n>realm_map</span><span class=p>)</span> <span class=o>></span> <span class=mi>0</span><span class=p>:</span>
+                    <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>[</span><span class=n>realm</span><span class=p>]</span> <span class=o>=</span> <span class=p>(</span><span class=n>realm_dir</span><span class=p>,</span> <span class=n>realm_map</span><span class=p>)</span>
+
+    <span class=k>def</span><span class=w> </span><span class=nf>_check_open</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""Enforce that the file manager is open."""</span>
+        <span class=k>if</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>__is_open</span><span class=p>:</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=s2>"Already closed!"</span><span class=p>)</span>
+
+    <span class=k>def</span><span class=w> </span><span class=nf>_get_sensitive_paths</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-></span> <span class=nb>list</span><span class=p>[</span><span class=n>Path</span><span class=p>]:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get the list of sensitive paths.</span>
+
+<span class=sd>        :return: the list of sensitive paths</span>
+<span class=sd>        """</span>
+        <span class=n>paths</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>list</span><span class=p>[</span><span class=n>Path</span><span class=p>]]</span> <span class=o>=</span> <span class=p>[</span>
+            <span class=bp>self</span><span class=o>.</span><span class=n>__base_dir</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>__realms_dir</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>__cache_file</span><span class=p>]</span>
+        <span class=n>paths</span><span class=o>.</span><span class=n>extend</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>__realms_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>,</span> <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=o>.</span><span class=n>keys</span><span class=p>()))</span>
+        <span class=k>return</span> <span class=n>paths</span>
+
+    <span class=k>def</span><span class=w> </span><span class=nf>__get</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>realm</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span>
+              <span class=n>is_file</span><span class=p>:</span> <span class=nb>bool</span><span class=p>,</span>
+              <span class=n>prefix</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+              <span class=n>suffix</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Path</span><span class=p>,</span> <span class=nb>bool</span><span class=p>]:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get a file or directory with the given ID in the specified realm.</span>
+
+<span class=sd>        :param realm: the realm</span>
+<span class=sd>        :param name: the id for the file</span>
+<span class=sd>        :param is_file: is it a file?</span>
+<span class=sd>        :param prefix: the optional prefix</span>
+<span class=sd>        :param suffix: the optional suffix</span>
+<span class=sd>        :return: the generated path and `True` if it was new,</span>
+<span class=sd>            or `False` if not.</span>
+<span class=sd>        """</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>_check_open</span><span class=p>()</span>
+        <span class=n>realm</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>realm</span><span class=p>)</span>
+        <span class=n>name</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>name</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>prefix</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=n>prefix</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>prefix</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>suffix</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+            <span class=n>suffix</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>suffix</span><span class=p>)</span>
+
+        <span class=k>if</span> <span class=n>realm</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>:</span>
+            <span class=n>realm_dir</span><span class=p>,</span> <span class=n>realm_map</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>[</span><span class=n>realm</span><span class=p>]</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>realm_dir</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__realms_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=n>realm</span><span class=p>)</span>
+            <span class=n>realm_dir</span><span class=o>.</span><span class=n>ensure_dir_exists</span><span class=p>()</span>
+            <span class=n>_make_ignore</span><span class=p>(</span><span class=n>realm_dir</span><span class=p>)</span>
+            <span class=n>realm_map</span> <span class=o>=</span> <span class=p>{}</span>
+            <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>[</span><span class=n>realm</span><span class=p>]</span> <span class=o>=</span> <span class=n>realm_dir</span><span class=p>,</span> <span class=n>realm_map</span>
+
+        <span class=n>result</span><span class=p>:</span> <span class=n>Path</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span>
+        <span class=n>is_new</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
+        <span class=k>if</span> <span class=n>name</span> <span class=ow>in</span> <span class=n>realm_map</span><span class=p>:</span>
+            <span class=n>result</span> <span class=o>=</span> <span class=n>realm_map</span><span class=p>[</span><span class=n>name</span><span class=p>]</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>is_new</span> <span class=o>=</span> <span class=kc>True</span>
+            <span class=n>rootname</span> <span class=o>=</span> <span class=n>prefix</span> <span class=ow>or</span> <span class=s2>""</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=nb>filter</span><span class=p>(</span><span class=n>_FILENAME_OK</span><span class=p>,</span> <span class=n>name</span><span class=p>))</span>
+            <span class=n>usename</span> <span class=o>=</span> <span class=n>rootname</span>
+            <span class=k>if</span> <span class=n>suffix</span><span class=p>:</span>
+                <span class=n>usename</span> <span class=o>=</span> <span class=sa>f</span><span class=s2>"</span><span class=si>{</span><span class=n>usename</span><span class=si>}{</span><span class=n>suffix</span><span class=si>}</span><span class=s2>"</span>
+
+            <span class=k>if</span> <span class=n>usename</span><span class=p>:</span>
+                <span class=n>test</span> <span class=o>=</span> <span class=n>realm_dir</span><span class=o>.</span><span class=n>resolve_inside</span><span class=p>(</span><span class=n>usename</span><span class=p>)</span>
+                <span class=k>if</span> <span class=ow>not</span> <span class=n>test</span><span class=o>.</span><span class=n>exists</span><span class=p>():</span>
+                    <span class=k>if</span> <span class=n>is_file</span><span class=p>:</span>
+                        <span class=k>if</span> <span class=ow>not</span> <span class=n>test</span><span class=o>.</span><span class=n>ensure_file_exists</span><span class=p>():</span>
+                            <span class=n>result</span> <span class=o>=</span> <span class=n>test</span>
+                    <span class=k>else</span><span class=p>:</span>
+                        <span class=n>test</span><span class=o>.</span><span class=n>ensure_dir_exists</span><span class=p>()</span>
+                        <span class=n>result</span> <span class=o>=</span> <span class=n>test</span>
+
+            <span class=k>if</span> <span class=n>result</span> <span class=ow>is</span> <span class=kc>None</span><span class=p>:</span>
+                <span class=p>(</span><span class=n>handle</span><span class=p>,</span> <span class=n>fpath</span><span class=p>)</span> <span class=o>=</span> <span class=n>mkstemp</span><span class=p>(</span><span class=n>prefix</span><span class=o>=</span><span class=n>rootname</span> <span class=ow>or</span> <span class=kc>None</span><span class=p>,</span>
+                                          <span class=n>suffix</span><span class=o>=</span><span class=n>suffix</span><span class=p>,</span> <span class=nb>dir</span><span class=o>=</span><span class=n>realm_dir</span><span class=p>)</span>
+                <span class=n>os_close</span><span class=p>(</span><span class=n>handle</span><span class=p>)</span>
+                <span class=n>result</span> <span class=o>=</span> <span class=n>Path</span><span class=p>(</span><span class=n>fpath</span><span class=p>)</span>
+                <span class=k>if</span> <span class=ow>not</span> <span class=n>is_file</span><span class=p>:</span>
+                    <span class=k>with</span> <span class=n>suppress</span><span class=p>(</span><span class=ne>FileNotFoundError</span><span class=p>):</span>
+                        <span class=n>os_remove</span><span class=p>(</span><span class=n>result</span><span class=p>)</span>
+                    <span class=n>result</span><span class=o>.</span><span class=n>ensure_dir_exists</span><span class=p>()</span>
+            <span class=n>realm_map</span><span class=p>[</span><span class=n>name</span><span class=p>]</span> <span class=o>=</span> <span class=n>result</span>
+
+        <span class=k>if</span> <span class=n>is_file</span><span class=p>:</span>
+            <span class=n>result</span><span class=o>.</span><span class=n>enforce_file</span><span class=p>()</span>
+        <span class=k>else</span><span class=p>:</span>
+            <span class=n>result</span><span class=o>.</span><span class=n>enforce_dir</span><span class=p>()</span>
+
+        <span class=n>bn</span><span class=p>:</span> <span class=n>Final</span><span class=p>[</span><span class=nb>str</span><span class=p>]</span> <span class=o>=</span> <span class=n>result</span><span class=o>.</span><span class=n>basename</span><span class=p>()</span>
+        <span class=k>if</span> <span class=n>prefix</span> <span class=ow>and</span> <span class=p>(</span><span class=ow>not</span> <span class=n>bn</span><span class=o>.</span><span class=n>startswith</span><span class=p>(</span><span class=n>prefix</span><span class=p>)):</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"prefix=</span><span class=si>{</span><span class=n>prefix</span><span class=si>!r}</span><span class=s2> but f=</span><span class=si>{</span><span class=n>result</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>suffix</span> <span class=ow>and</span> <span class=p>(</span><span class=ow>not</span> <span class=n>bn</span><span class=o>.</span><span class=n>endswith</span><span class=p>(</span><span class=n>suffix</span><span class=p>)):</span>
+            <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span><span class=sa>f</span><span class=s2>"suffix=</span><span class=si>{</span><span class=n>suffix</span><span class=si>!r}</span><span class=s2> but f=</span><span class=si>{</span><span class=n>result</span><span class=si>!r}</span><span class=s2>."</span><span class=p>)</span>
+        <span class=k>return</span> <span class=n>result</span><span class=p>,</span> <span class=n>is_new</span>
+
+<div class=viewcode-block id=FileManager.list_realm>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.file_manager.FileManager.list_realm>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>list_realm</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>realm</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>files</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>,</span>
+                   <span class=n>directories</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>True</span><span class=p>)</span> <span class=o>-></span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Path</span><span class=p>,</span> <span class=o>...</span><span class=p>]:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        List all the files and directories in a given realm.</span>
+
+<span class=sd>        :param realm: the realm that we want to list</span>
+<span class=sd>        :param files: should we list files?</span>
+<span class=sd>        :param directories: should we list directories?</span>
+<span class=sd>        :return: the iterator with the data</span>
+<span class=sd>        """</span>
+        <span class=n>realm</span> <span class=o>=</span> <span class=n>_make_key</span><span class=p>(</span><span class=n>realm</span><span class=p>)</span>
+        <span class=k>if</span> <span class=n>realm</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>:</span>
+            <span class=n>_</span><span class=p>,</span> <span class=n>realm_map</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>[</span><span class=n>_make_key</span><span class=p>(</span><span class=n>realm</span><span class=p>)]</span>
+            <span class=k>return</span> <span class=nb>tuple</span><span class=p>(</span><span class=nb>filter</span><span class=p>(</span><span class=k>lambda</span> <span class=n>v</span><span class=p>:</span> <span class=p>(</span><span class=n>files</span> <span class=ow>and</span> <span class=n>v</span><span class=o>.</span><span class=n>is_file</span><span class=p>())</span> <span class=ow>or</span> <span class=p>(</span>
+                <span class=n>directories</span> <span class=ow>and</span> <span class=n>v</span><span class=o>.</span><span class=n>is_dir</span><span class=p>()),</span> <span class=n>realm_map</span><span class=o>.</span><span class=n>values</span><span class=p>()))</span>
+        <span class=k>return</span> <span class=p>()</span></div>
+
+
+<div class=viewcode-block id=FileManager.get_dir>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.file_manager.FileManager.get_dir>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_dir</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>realm</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>)</span> <span class=o>-></span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Path</span><span class=p>,</span> <span class=nb>bool</span><span class=p>]:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get a directory representing the given name in the given realm.</span>
+
+<span class=sd>        :param realm: the realm</span>
+<span class=sd>        :param name: the name or ID that the directory should represent</span>
+<span class=sd>        :return: the directory path and a `bool` indicating whether it was</span>
+<span class=sd>            newly generated (`True`) or not if it already existed (`False`)</span>
+<span class=sd>        """</span>
+        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get</span><span class=p>(</span><span class=n>realm</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=kc>False</span><span class=p>)</span></div>
+
+
+<div class=viewcode-block id=FileManager.get_file>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.file_manager.FileManager.get_file>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>get_file</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>realm</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span>
+                 <span class=n>prefix</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
+                 <span class=n>suffix</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-></span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Path</span><span class=p>,</span> <span class=nb>bool</span><span class=p>]:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Get a file representing the given name in the given realm.</span>
+
+<span class=sd>        :param realm: the realm</span>
+<span class=sd>        :param name: the name or ID that the file should represent</span>
+<span class=sd>        :param prefix: the optional prefix</span>
+<span class=sd>        :param suffix: the optional suffix</span>
+<span class=sd>        :return: the generated file path and `True` if it was new, or</span>
+<span class=sd>            `False` if not.</span>
+<span class=sd>        """</span>
+        <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>__get</span><span class=p>(</span><span class=n>realm</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=kc>True</span><span class=p>,</span> <span class=n>prefix</span><span class=p>,</span> <span class=n>suffix</span><span class=p>)</span></div>
+
+
+<div class=viewcode-block id=FileManager.close>
+<a class=viewcode-back href=../../../texgit.repository.html#texgit.repository.file_manager.FileManager.close>[docs]</a>
+    <span class=k>def</span><span class=w> </span><span class=nf>close</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-></span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""Close the file manager and write cache list."""</span>
+        <span class=n>opn</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>__is_open</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>__is_open</span> <span class=o>=</span> <span class=kc>False</span>
+        <span class=k>if</span> <span class=n>opn</span><span class=p>:</span>  <span class=c1># only if we were open...</span>
+            <span class=c1># flush or clear directory of cached post-processed files</span>
+            <span class=k>with</span> <span class=n>suppress</span><span class=p>(</span><span class=ne>FileNotFoundError</span><span class=p>):</span>
+                <span class=n>os_remove</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>__cache_file</span><span class=p>)</span>
+            <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=p>)</span> <span class=o>></span> <span class=mi>0</span><span class=p>:</span>  <span class=c1># we got cached files</span>
+                <span class=bp>self</span><span class=o>.</span><span class=n>__cache_file</span><span class=o>.</span><span class=n>write_all_str</span><span class=p>(</span><span class=n>json</span><span class=o>.</span><span class=n>dumps</span><span class=p>(</span>  <span class=c1># store cache</span>
+                    <span class=p>{</span><span class=n>realm</span><span class=p>:</span> <span class=p>{</span>
+                        <span class=n>name</span><span class=p>:</span> <span class=n>path</span><span class=o>.</span><span class=n>relative_to</span><span class=p>(</span><span class=n>rv</span><span class=p>[</span><span class=mi>0</span><span class=p>])</span>
+                        <span class=k>for</span> <span class=n>name</span><span class=p>,</span> <span class=n>path</span> <span class=ow>in</span> <span class=n>rv</span><span class=p>[</span><span class=mi>1</span><span class=p>]</span><span class=o>.</span><span class=n>items</span><span class=p>()</span>
+                    <span class=p>}</span> <span class=k>for</span> <span class=n>realm</span><span class=p>,</span> <span class=n>rv</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>__map</span><span class=o>.</span><span class=n>items</span><span class=p>()}))</span></div>
+
+
+    <span class=k>def</span><span class=w> </span><span class=fm>__exit__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>exception_type</span><span class=p>,</span> <span class=n>_</span><span class=p>,</span> <span class=n>__</span><span class=p>)</span> <span class=o>-></span> <span class=nb>bool</span><span class=p>:</span>
+<span class=w>        </span><span class=sd>"""</span>
+<span class=sd>        Close the context manager.</span>
+
+<span class=sd>        :param exception_type: ignored</span>
+<span class=sd>        :param _: ignored</span>
+<span class=sd>        :param __: ignored</span>
+<span class=sd>        :returns: `True` to suppress an exception, `False` to rethrow it</span>
+<span class=sd>        """</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>close</span><span class=p>()</span>  <span class=c1># close the manager and flush cache</span>
+        <span class=k>return</span> <span class=n>exception_type</span> <span class=ow>is</span> <span class=kc>None</span></div>
+
+</pre></div><div class=clearer></div></div></div></div><div aria-label=Main class=sphinxsidebar role=navigation><div class=sphinxsidebarwrapper><search id=searchbox role=search style=display:none> <h3 id=searchlabel>Quick search</h3> <div class=searchformwrapper><form action=../../../search.html class=search><input aria-labelledby=searchlabel autocapitalize=off autocomplete=off autocorrect=off name=q spellcheck=false><input type=submit value=Go></form></div> </search><script>document.getElementById(`searchbox`).style.display=`block`;</script></div></div><div class=clearer></div></div><div aria-label=Related class=related role=navigation><h3>Navigation</h3><ul><li class=right style=margin-right:10px><a title="General Index"href=../../../genindex.html>index</a><li class=right><a title="Python Module Index"href=../../../py-modindex.html>modules</a> |<li class="nav-item nav-item-0"><a href=../../../index.html>texgit 0.9.11 documentation</a> »<li class="nav-item nav-item-1"><a href=../../index.html>Module code</a> »<li class="nav-item nav-item-this"><a href>texgit.repository.file_manager</a></ul></div><div class=footer role=contentinfo>© Copyright 2023-2026, Thomas Weise.</div>

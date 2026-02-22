@@ -20,7 +20,7 @@
 #
 
 # pycommons provides lots of utilities
-pycommons == 0.8.69
+pycommons == 0.8.88
 
 # strip-hints is a tool for removing type hints
 strip-hints == 0.1.13

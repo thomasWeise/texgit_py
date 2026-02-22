@@ -22,9 +22,9 @@ def test_aux() -> None:
           temp_file(td, suffix=".aux") as tf):
         txt = [
             r"\relax",
-            f"{REQUEST_GIT_FILE} {{a}}{{{mrepo}}}{{"
-            f"functions/def_factorial.py}}{{"
-            f"python3 -m texgit.formatters.python --args format}}",
+            (f"{REQUEST_GIT_FILE} {{a}}{{{mrepo}}}{{"
+             f"functions/def_factorial.py}}{{"
+             f"python3 -m texgit.formatters.python --args format}}"),
             r"\gdef \@abspage@last{1}"]
         with tf.open_for_write() as wd:
             write_lines(txt, wd)

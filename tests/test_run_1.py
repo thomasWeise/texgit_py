@@ -81,8 +81,8 @@ def test_aux_3() -> None:
           temp_file(td, suffix=".aux") as tf):
         txt = [
             r"\relax",
-            r"\@texgit@gitFile {R1}{https://github.com/"
-            r"thomasWeise/texgit_tex}{examples/dummy.tex}{}",
+            (r"\@texgit@gitFile {R1}{https://github.com/"
+             r"thomasWeise/texgit_tex}{examples/dummy.tex}{}"),
             r"\@texgit@needsTexgitPass",
             r"\gdef \@abspage@last{1}"]
         with tf.open_for_write() as wd:

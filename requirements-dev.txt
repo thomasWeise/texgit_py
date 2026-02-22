@@ -5,7 +5,7 @@
 #
 
 # pycommons provides lots of utilities
-pycommons[dev] == 0.8.69
+pycommons[dev] == 0.8.88
 
 # for the PDF example
 fpdf2 == 2.8.4

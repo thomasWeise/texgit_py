@@ -13,7 +13,7 @@ BASE_PATH_REPLACEMENT: Final[str] = "{...}"
 
 #: the literal string start and ends.
 __SE: Final[tuple[tuple[str, str], ...]] = tuple(sorted(chain(
-    ((escape(__s), escape(__e)) for __s, __e in (
+    ((escape(strs), escape(stre)) for strs, stre in (
         (" ", " "), ("'", "'"), ("(", ")"), ("{", "}"), ("[", "]"),
         ("<", ">"), ("`", "`"), (",", " "), (",", ","), ('"', '"'),
         (";", " "), (";", ";"), (" ", ". "))),

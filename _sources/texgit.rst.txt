@@ -1,0 +1,35 @@
+texgit package
+==============
+
+.. automodule:: texgit
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   texgit.formatters
+   texgit.repository
+
+Submodules
+----------
+
+texgit.run module
+-----------------
+
+.. automodule:: texgit.run
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+texgit.version module
+---------------------
+
+.. automodule:: texgit.version
+   :members:
+   :show-inheritance:
+   :undoc-members:

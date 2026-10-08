@@ -1,0 +1,7 @@
+texgit
+======
+
+.. toctree::
+   :maxdepth: 4
+
+   texgit

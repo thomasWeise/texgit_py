@@ -33,4 +33,4 @@ jobs:
         rm -rf /home/runner/work/texgit_py/texgit_py/dist/*.tar.xz
 # deploy to pypi
     - name: Publish package distributions to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      uses: pypa/gh-action-pypi-publish@release/v1.14.3
